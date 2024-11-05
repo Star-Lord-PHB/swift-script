@@ -1,0 +1,28 @@
+{
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "sourceLanguages": [
+                "swift"
+            ],
+            "args": [],
+            "cwd": "${workspaceFolder:swift-script}",
+            "name": "Debug SwiftScript",
+            "program": "${workspaceFolder:swift-script}/.build/debug/SwiftScript",
+            "preLaunchTask": "swift: Build Debug SwiftScript"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "sourceLanguages": [
+                "swift"
+            ],
+            "args": [],
+            "cwd": "${workspaceFolder:swift-script}",
+            "name": "Release SwiftScript",
+            "program": "${workspaceFolder:swift-script}/.build/release/SwiftScript",
+            "preLaunchTask": "swift: Build Release SwiftScript"
+        }
+    ]
+}
