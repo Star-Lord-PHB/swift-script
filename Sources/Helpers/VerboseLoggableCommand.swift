@@ -15,6 +15,7 @@ nonisolated(unsafe) private var normalCleanUpOperations: [@MainActor () async ->
 
 
 protocol VerboseLoggableCommand: AsyncParsableCommand {
+    var appEnv: AppEnv { get set }
     var verbose: Bool { get }
     mutating func wrappedRun() async throws
 }
@@ -23,8 +24,13 @@ protocol VerboseLoggableCommand: AsyncParsableCommand {
 extension VerboseLoggableCommand {
     
     var verbose: Bool { false }
-    
-    
+
+    init(appEnv: AppEnv) {
+        self.init()
+        self.appEnv = appEnv
+    }
+
+
     mutating func run() async throws {
         do {
             SignalHandler.startSignalListening()

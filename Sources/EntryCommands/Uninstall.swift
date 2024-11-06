@@ -22,18 +22,21 @@ struct SwiftScriptUninstall: VerboseLoggableCommand {
     
     @Option(name: .customLong("Xbuild"), parsing: .singleValue, help: #"Pass flag through to "swift build" command"#)
     var buildArguments: [String] = []
+
+    var appEnv: AppEnv = .default
+
     
     func wrappedRun() async throws {
         
-        try await ProcessLock.shared.withLock {
+        try await appEnv.withProcessLock {
 
             printLog("Loading installed packages")
-            var installedPackages = try await InstalledPackage.load()
+            var installedPackages = try await appEnv.loadInstalledPackages()
             var identitiesToRemove = Set(identities.map { $0.lowercased() })
             
             let originalPackages = installedPackages
             printLog("Caching current runner package manifest")
-            let originalPackageManifest = try await loadPackageManifes()
+            let originalPackageManifest = try await appEnv.loadPackageManifes()
             
             for (i, package) in installedPackages.enumerated()
             where identitiesToRemove.contains(package.identity) {
@@ -50,23 +53,23 @@ struct SwiftScriptUninstall: VerboseLoggableCommand {
             }
             
             printLog("Loading configuration")
-            let config = try await AppConfig.load()
+            let config = try await appEnv.loadAppConfig()
             
             print("Removing \(identities.joined(separator: ", "))")
             
             registerCleanUp {
                 print("Restoring original package manifest and installed packages")
-                try? await originalPackageManifest.write(to: AppPath.runnerPackageManifestUrl)
-                try? await JSONEncoder().encode(originalPackages).write(to: AppPath.installedPackagesUrl)
+                try? await originalPackageManifest.write(to: appEnv.runnerPackageManifestUrl)
+                try? await appEnv.saveInstalledPackages(originalPackages)
             }
             
             print("Saving updated installed packages")
-            try await InstalledPackage.save(installedPackages)
+            try await appEnv.saveInstalledPackages(installedPackages)
             print("Saving updated runner package manifest")
-            try await updatePackageManifest(installedPackages: installedPackages, config: config)
+            try await appEnv.updatePackageManifest(installedPackages: installedPackages, config: config)
             
             print("Building")
-            try await CMD.buildRunnerPackage(arguments: buildArguments, verbose: true)
+            try await appEnv.buildRunnerPackage(arguments: buildArguments, verbose: true)
             
         }
         

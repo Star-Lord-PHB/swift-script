@@ -12,57 +12,6 @@ import ArgumentParser
 
 
 
-extension AppPath {
-
-    static func packageIdentity(of packageUrl: URL) -> String {
-    
-        let pathExtension = packageUrl.pathExtension
-        
-        return if pathExtension == "git" {
-            packageUrl.deletingPathExtension().lastPathComponent.lowercased()
-        } else {
-            packageUrl.lastPathComponent.lowercased()
-        }
-        
-    }
-
-
-    static func packageIdentity(of packageUrl: String) throws -> String {
-        guard let url = URL(string: packageUrl) else {
-            throw ValidationError("Invalid url: \(packageUrl)")
-        }
-        return packageIdentity(of: url)
-    }
-
-
-
-    static func packageCheckoutUrl(of packageUrl: URL) -> URL {
-        
-        let pathExtension = packageUrl.pathExtension
-        
-        return if pathExtension == "git" {
-            AppPath.installedPackageCheckoutsUrl
-                .appendingCompat(path: packageUrl.deletingPathExtension().lastPathComponent)
-        } else {
-            AppPath.installedPackageCheckoutsUrl
-                .appendingCompat(path: packageUrl.lastPathComponent)
-        }
-        
-    }
-
-
-
-    static func packageCheckoutUrl(of packageUrl: String) throws -> URL {
-        guard let url = URL(string: packageUrl) else {
-            throw ValidationError("Invalid url: \(packageUrl)")
-        }
-        return packageCheckoutUrl(of: url)
-    }
-
-}
-
-
-
 extension AsyncSequence {
     
     func collectAsArray() async throws -> [Element] {

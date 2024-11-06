@@ -28,6 +28,8 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
     
     @Option(name: .customLong("Xbuild"), parsing: .singleValue, help: #"Pass flag through to "swift build" command"#)
     var buildArguments: [String] = []
+
+    var appEnv: AppEnv = .default
     
     var exactVersion: String? { packageVersionSpecifier.exactVersion }
     var branch: String? { packageVersionSpecifier.branch }
@@ -45,22 +47,22 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
     }
     
     
-    mutating func wrappedRun() async throws {
+    func wrappedRun() async throws {
         
-        try await ProcessLock.shared.withLock {
+        try await appEnv.withProcessLock {
 
-            let newPackageIdentity = try AppPath.packageIdentity(of: package)
+            let newPackageIdentity = try appEnv.packageIdentity(of: package)
             
             printLog("Package identity identified as \(newPackageIdentity)")
         
             printLog("Loading installed packages")
-            var installedPackages = try await InstalledPackage.load()
+            var installedPackages = try await appEnv.loadInstalledPackages()
             printLog("Loading configuration")
-            let config = try await AppConfig.load()
+            let config = try await appEnv.loadAppConfig()
             
             let originalPackages = installedPackages
             printLog("Caching current runner package manifest")
-            let originalPackageManifest = try await loadPackageManifes()
+            let originalPackageManifest = try await appEnv.loadPackageManifes()
             
             printLog("Checking whether package is already installed")
             conflictHandle: if let conflictPackageIndex = installedPackages
@@ -91,7 +93,7 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
             print("Version requirement extracted as: \(requirement)")
             
             print("Fetching products of package \(newPackageIdentity)")
-            let newPackageProducts = try await CMD.fetchPackageProducts(
+            let newPackageProducts = try await appEnv.fetchPackageProducts(
                 of: package,
                 requirement: requirement,
                 config: config
@@ -110,17 +112,17 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
             
             registerCleanUp {
                 print("Restoring original package manifest and installed packages")
-                try? await originalPackageManifest.write(to: AppPath.runnerPackageManifestUrl)
-                try? await JSONEncoder().encode(originalPackages).write(to: AppPath.installedPackagesUrl)
+                try? await originalPackageManifest.write(to: appEnv.runnerPackageManifestUrl)
+                try? await JSONEncoder().encode(originalPackages).write(to: appEnv.installedPackagesUrl)
             }
             
             print("Saving updated installed packages")
-            try await InstalledPackage.save(installedPackages)
+            try await appEnv.saveInstalledPackages(installedPackages)
             print("Saving updating runner package manifest")
-            try await updatePackageManifest(installedPackages: installedPackages, config: config)
+            try await appEnv.updatePackageManifest(installedPackages: installedPackages, config: config)
             
             print("Building")
-            try await CMD.buildRunnerPackage(arguments: buildArguments, verbose: true)
+            try await appEnv.buildRunnerPackage(arguments: buildArguments, verbose: true)
             
         }
         
@@ -139,7 +141,7 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
             try .range(from: upToNextMinorVersion, to: upperBoundVersion, option: .uptoNextMinor)
         } else {
             try .range(
-                from: await CMD.fetchLatestVersion(of: package, upTo: upperBoundVersion).description,
+                from: await appEnv.fetchLatestVersion(of: package, upTo: upperBoundVersion).description,
                 to: upperBoundVersion,
                 option: .upToNextMajor
             )

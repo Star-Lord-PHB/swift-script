@@ -31,6 +31,8 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
     
     @Flag(name: [.customShort("y"), .customLong("yes")])
     var noPrompt: Bool = false
+
+    var appEnv: AppEnv = .default
     
     
     func validate() throws {
@@ -46,11 +48,11 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
             
             printLog("Loading installed packages")
             guard
-                let url = try await InstalledPackage.load()
+                let url = try await appEnv.loadInstalledPackages()
                     .first(where: { $0.identity == package })?.url
             else { try errorAbort("Package \(package) is not installed") }
             
-            var installCommand = SwiftScriptInstall()
+            var installCommand = SwiftScriptInstall(appEnv: appEnv)
             installCommand.package = url.absoluteString
             installCommand.packageVersionSpecifier = packageUpdateVersionSpec
             installCommand.buildArguments = buildArguments
@@ -61,15 +63,15 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
             
         } else if all {
             
-            try await ProcessLock.shared.withLock {
+            try await appEnv.withProcessLock {
 
                 printLog("Loading configuration")
-                let config = try await AppConfig.load()
+                let config = try await appEnv.loadAppConfig()
             
                 printLog("Caching current installed packages")
-                let originalPackages = try await InstalledPackage.load()
+                let originalPackages = try await appEnv.loadInstalledPackages()
                 printLog("Caching current runner package manifest")
-                let originalPackageManifest = try await loadPackageManifes()
+                let originalPackageManifest = try await appEnv.loadPackageManifes()
                 
                 let updatedPackages = try await updatePackages(originalPackages, config: config)
                 
@@ -102,17 +104,17 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
                 }
                 
                 registerCleanUp {
-                    try? await originalPackageManifest.write(to: AppPath.runnerPackageManifestUrl)
-                    try? await JSONEncoder().encode(originalPackages).write(to: AppPath.runnerPackageManifestUrl)
+                    try? await originalPackageManifest.write(to: appEnv.runnerPackageManifestUrl)
+                    try? await appEnv.saveInstalledPackages(originalPackages)
                 }
                 
                 print("Saving updated installed packages")
-                try await InstalledPackage.save(updatedPackages)
+                try await appEnv.saveInstalledPackages(updatedPackages)
                 print("Saving updated runner package manifest")
-                try await updatePackageManifest(installedPackages: updatedPackages, config: config)
+                try await appEnv.updatePackageManifest(installedPackages: updatedPackages, config: config)
                 
                 print("Building")
-                try await CMD.buildRunnerPackage(arguments: buildArguments, verbose: true)
+                try await appEnv.buildRunnerPackage(arguments: buildArguments, verbose: true)
                 
             }
             
@@ -137,7 +139,7 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
                 let newRequirement = switch package.requirement {
                     case .branch, .exact: package.requirement
                     case .range: try await .range(
-                        from: CMD.fetchLatestVersion(of: package.url).description,
+                        from: appEnv.fetchLatestVersion(of: package.url).description,
                         option: .upToNextMajor
                     )
                 } as InstalledPackage.Requirement
@@ -146,7 +148,7 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
                     return package
                 }
                 
-                let products = try await CMD.fetchPackageProducts(
+                let products = try await appEnv.fetchPackageProducts(
                     of: package.url,
                     requirement: package.requirement,
                     config: config

@@ -25,6 +25,9 @@ struct SwiftScriptRun: VerboseLoggableCommand {
     
     @Flag(name: .shortAndLong)
     var verbose: Bool = false
+
+    var appEnv: AppEnv = .default
+
     
     mutating func wrappedRun() async throws {
         
@@ -34,8 +37,8 @@ struct SwiftScriptRun: VerboseLoggableCommand {
         let scriptType = try await ScriptType.of(fileAt: scriptUrl)
         printLog("Script type identified as \"\(scriptType)\"")
         
-        let scriptBuildUrl = AppPath.scriptBuildUrl(ofType: scriptType)
-        let scriptExecUrl = AppPath.makeExecTempUrl()
+        let scriptBuildUrl = appEnv.scriptBuildUrl(ofType: scriptType)
+        let scriptExecUrl = appEnv.makeExecTempUrl()
         printLog("Allocated executation path: \(scriptExecUrl.compactPath(percentEncoded: false))")
         
         registerCleanUp(when: .always) { [verbose] in
@@ -43,21 +46,23 @@ struct SwiftScriptRun: VerboseLoggableCommand {
             try? await FileManager.default.remove(at: scriptExecUrl)
         }
         
-        try await ProcessLock.shared.withLock {
+        try await appEnv.withProcessLock {
+
             printLog("Cleaning old script")
-            try? await FileManager.default.remove(at: scriptBuildUrl)
+            try await appEnv.cleanOldScripts()
             printLog("Copying script to build path")
             try await FileManager.default.copy(scriptUrl, to: scriptBuildUrl)
             
             printLog("Building runner with arguments: \(swiftArguments)")
-            try await CMD.buildRunnerPackage(arguments: swiftArguments)
+            try await appEnv.buildRunnerPackage(arguments: swiftArguments, verbose: verbose)
             
             printLog("Moving executable to allocated execution path")
-            try await FileManager.default.move(AppPath.executableProductUrl, to: scriptExecUrl)
+            try await FileManager.default.move(appEnv.executableProductUrl, to: scriptExecUrl)
+            
         }
         
         printLog("Executing script at \(scriptExecUrl.compactPath(percentEncoded: false)) with arguments: \(arguments)")
-        try await CMD.runExecutable(at: scriptExecUrl, arguments: arguments)
+        try await appEnv.runExecutable(at: scriptExecUrl, arguments: arguments)
         
     }
     

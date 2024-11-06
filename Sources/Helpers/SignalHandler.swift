@@ -21,8 +21,9 @@ enum SignalHandler {
     static func startSignalListening() {
         Task {
             let _ = await signalStream.stream.first(where: { _ in true })
+            tasks.forEach { $0.cancel() }
             for task in tasks {
-                await task.cancelAndWait()
+                await task.wait()
             }
             for operation in cleanUpOperations {
                 await operation()
@@ -32,17 +33,23 @@ enum SignalHandler {
     }
     
     
+    static private let operationLock = NSLock()
     nonisolated(unsafe) static private var cleanUpOperations: [@MainActor () async -> Void] = []
+    static private let taskLock = NSLock()
     nonisolated(unsafe) static private var tasks: [Task<Void, Error>] = []
     
     
     static func registerCleanUp(operation: @MainActor @escaping () async -> Void) {
-        cleanUpOperations.append(operation)
+        operationLock.withLock {
+            cleanUpOperations.append(operation)
+        }
     }
     
     
     static func registerTask(_ task: Task<Void, Error>) {
-        tasks.append(task)
+        taskLock.withLock {
+            tasks.append(task)
+        }
     }
     
 }

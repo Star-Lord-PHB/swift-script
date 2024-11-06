@@ -22,15 +22,17 @@ struct SwiftScriptInfo: VerboseLoggableCommand {
     
     @Flag(name: .long)
     var verbose: Bool = false
+
+    var appEnv: AppEnv = .default
     
 
     mutating func wrappedRun() async throws {
         
         package = package.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         
-        let packageCheckoutPath = try AppPath.packageCheckoutUrl(of: package)
+        let packageCheckoutPath = try appEnv.packageCheckoutUrl(of: package)
         
-        try await ProcessLock.shared.withLock {
+        try await appEnv.withProcessLock {
             
             guard await FileManager.default.fileExistsAsync(at: packageCheckoutPath) else {
                 try errorAbort("Package \(package) is not installed")
@@ -39,17 +41,17 @@ struct SwiftScriptInfo: VerboseLoggableCommand {
             printLog("Loading metadata of package \(package)")
             
             guard
-                let packageDescription = try await InstalledPackage.load()
+                let packageDescription = try await appEnv.loadInstalledPackages()
                     .first(where: { $0.identity == package })
             else { try errorAbort("Package \(package) is not installed") }
             
             printLog("Loading dependencies of package \(package)")
             
-            let dependenciesStr = try await CMD.loadPackageDependenciesText(of: packageCheckoutPath)
+            let dependenciesStr = try await appEnv.loadPackageDependenciesText(of: packageCheckoutPath)
             
             printLog("Loading modules of package \(package)")
             
-            let packageModules = try await CMD.loadPackageDescription(
+            let packageModules = try await appEnv.loadPackageDescription(
                 of: packageCheckoutPath,
                 as: PackageModules.self
             )
@@ -57,7 +59,7 @@ struct SwiftScriptInfo: VerboseLoggableCommand {
             printLog("Loading resolved version of package \(package)")
             
             guard
-                let resolvedVersion = try await ResolvedDependencyVersionList.load().dependencies
+                let resolvedVersion = try await appEnv.loadResolvedDependencyVersionList()
                     .first(where: { $0.identity == package })?
                     .version
             else { try errorAbort("Package \(package) is not installed") }

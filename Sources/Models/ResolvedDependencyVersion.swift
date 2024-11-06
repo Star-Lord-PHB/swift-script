@@ -49,20 +49,3 @@ struct ResolvedDependencyVersion {
     }
     
 }
-
-
-
-extension ResolvedDependencyVersionList {
-    
-    static func load() async throws -> Self {
-        
-        try await CMD.resolveRunnerPackage()
-        
-        return try await JSONDecoder().decode(
-            self,
-            from: .read(contentsOf: AppPath.runnerResolvedPackagesUrl)
-        )
-        
-    }
-    
-}

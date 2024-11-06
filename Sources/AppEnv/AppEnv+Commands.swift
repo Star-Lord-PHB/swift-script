@@ -1,51 +1,44 @@
-//
-//  Commands.swift
-//  swift-script
-//
-//  Created by Star_Lord_PHB on 2024/10/24.
-//
-
 import Foundation
 import SwiftCommand
 import FileManagerPlus
 import ArgumentParser
 
 
-enum CMD {
-    
-    static func resolveRunnerPackage(verbose: Bool = false) async throws {
+extension AppEnv {
+
+    func resolveRunnerPackage(verbose: Bool = false) async throws {
         try await Command.findInPath(withName: "swift")?
             .addArguments(
                 "package", "resolve",
-                "--package-path", AppPath.runnerPackageUrl.compactPath(percentEncoded: false)
+                "--package-path", runnerPackageUrl.compactPath(percentEncoded: false)
             )
             .wait(printingOutput: verbose)
     }
 
 
-    static func buildRunnerPackage(
+    func buildRunnerPackage(
         arguments: [String] = [],
         verbose: Bool = false
     ) async throws {
         try await Command.findInPath(withName: "swift")?
             .addArguments(
                 "build",
-                "--package-path", AppPath.runnerPackageUrl.compactPath(percentEncoded: false),
+                "--package-path", runnerPackageUrl.compactPath(percentEncoded: false),
                 "-c", "release"
             )
             .wait(printingOutput: verbose)
     }
-    
-    
-    static func createNewPackage(at url: URL) async throws {
+
+
+    func createNewPackage(at url: URL) async throws {
         try await Command.findInPath(withName: "swift")?
             .setCWD(.init(url.compactPath(percentEncoded: false)))
             .addArguments("package", "init")
             .wait(hidingOutput: true)
     }
-    
-    
-    static func fetchLatestVersion(
+
+
+    func fetchLatestVersion(
         of packageUrl: URL,
         upTo upperVersion: Version? = nil,
         verbose: Bool = false
@@ -65,9 +58,9 @@ enum CMD {
         guard let version else { throw ValidationError("Fail to find any version matched") }
         return version
     }
-    
-    
-    static func fetchLatestVersion(
+
+
+    func fetchLatestVersion(
         of packageUrl: String,
         upTo upperVersion: String? = nil,
         verbose: Bool = false
@@ -84,49 +77,49 @@ enum CMD {
             return try await fetchLatestVersion(of: url, verbose: verbose)
         }
     }
-    
-    
-    static func fetchPackageProducts(
+
+
+    func fetchPackageProducts(
         of packageRemoteUrl: URL,
         requirement: InstalledPackage.Requirement,
         config: AppConfig,
         verbose: Bool = false
     ) async throws -> PackageProducts {
-        
-        try await AppPath.withTempFolder { tempFolderUrl in
-            
+
+        try await withTempFolder { tempFolderUrl in
+
             try await createTempPackage(
                 at: tempFolderUrl,
                 packageUrl: packageRemoteUrl,
                 requirement: requirement,
                 config: config
             )
-            
+
             try await Command.findInPath(withName: "swift")?
                 .addArguments(
                     "package", "resolve",
                     "--package-path", tempFolderUrl.compactPath(percentEncoded: false)
                 )
                 .wait(printingOutput: verbose)
-            
+
             let packageCheckoutFolderName = if packageRemoteUrl.pathExtension == "git" {
                 packageRemoteUrl.deletingPathExtension().lastPathComponent
             } else {
                 packageRemoteUrl.lastPathComponent
             }
-            
+
             let packageCheckoutUrl = tempFolderUrl
                 .appendingCompat(path: ".build/checkouts/")
                 .appendingCompat(path: packageCheckoutFolderName)
-            
+
             return try await PackageProducts.load(from: packageCheckoutUrl)
-            
+
         }
-        
+
     }
-    
-    
-    static func fetchPackageProducts(
+
+
+    func fetchPackageProducts(
         of packageRemoteUrl: String,
         requirement: InstalledPackage.Requirement,
         config: AppConfig,
@@ -137,60 +130,60 @@ enum CMD {
         }
         return try await fetchPackageProducts(of: url, requirement: requirement, config: config, verbose: verbose)
     }
-    
-    
-    static func runExecutable(at executableUrl: URL, arguments: [String]) async throws {
+
+
+    func runExecutable(at executableUrl: URL, arguments: [String]) async throws {
         try await Command(executablePath: .init(executableUrl.compactPath(percentEncoded: false)))
             .addArguments(arguments)
             .wait()
     }
-    
-    
-    static func printRunnerDependencies() async throws {
+
+
+    func printRunnerDependencies() async throws {
         try await Command.findInPath(withName: "swift")?
             .addArguments(
                 "package", "show-dependencies",
-                "--package-path", AppPath.runnerPackageUrl.compactPath(percentEncoded: false)
+                "--package-path", runnerPackageUrl.compactPath(percentEncoded: false)
             )
             .wait()
     }
-    
-    
-    static func loadPackageDependenciesText(of packageUrl: URL) async throws -> String {
-        
+
+
+    func loadPackageDependenciesText(of packageUrl: URL) async throws -> String {
+
         let dependenciesOutputFileUrl = packageUrl.appendingCompat(path: "dependencies_text_output.txt")
         try await grantPermission(forFileAt: dependenciesOutputFileUrl)
         try await FileManager.default.createFile(
             at: dependenciesOutputFileUrl,
             replaceExisting: true
         )
-        
+
         try await Command.findInPath(withName: "swift")?
             .setCWD(.init(packageUrl.compactPath(percentEncoded: false)))
             .addArguments("package", "show-dependencies")
             .setOutputs(.write(toFile: .init(dependenciesOutputFileUrl.compactPath(percentEncoded: false))))
             .wait()
-        
+
         return try await String(
             data: .read(contentsOf: dependenciesOutputFileUrl),
             encoding: .utf8
         ) ?? ""
-        
+
     }
-    
-    
-    static func loadPackageDescription<T: Decodable>(
+
+
+    func loadPackageDescription<T: Decodable>(
         of packageUrl: URL,
         as type: T.Type = T.self
     ) async throws -> T {
-        
+
         let packageModulesOutputFileUrl = packageUrl.appendingCompat(path: "package_description_output.txt")
         try await grantPermission(forFileAt: packageModulesOutputFileUrl)
         try await FileManager.default.createFile(
             at: packageModulesOutputFileUrl,
             replaceExisting: true
         )
-        
+
         try await Command.findInPath(withName: "swift")?
             .setCWD(.init(packageUrl.compactPath(percentEncoded: false)))
             .addArguments("package", "describe", "--type", "json")
@@ -198,17 +191,17 @@ enum CMD {
                 .write(toFile: .init(packageModulesOutputFileUrl.compactPath(percentEncoded: false)))
             )
             .wait()
-        
+
         return try await JSONDecoder().decode(
             T.self,
             from: .read(contentsOf: packageModulesOutputFileUrl)
         )
-        
+
     }
 
 
-    static func fetchSwiftVersion() async throws -> Version {
-        try await AppPath.withTempFolder { folderUrl in
+    func fetchSwiftVersion() async throws -> Version {
+        try await withTempFolder { folderUrl in
             try await createNewPackage(at: folderUrl)
             guard
                 let versionStr = try await Command.findInPath(withName: "swift")?
@@ -223,8 +216,8 @@ enum CMD {
             return version
         }
     }
-    
-    private static func grantPermission(forFileAt url: URL) async throws {
+
+    private func grantPermission(forFileAt url: URL) async throws {
         if await FileManager.default.fileExistsAsync(at: url) {
             try await FileManager.default.setInfoAsync(
                 .posixPermission,
@@ -233,5 +226,5 @@ enum CMD {
             )
         }
     }
-    
+
 }

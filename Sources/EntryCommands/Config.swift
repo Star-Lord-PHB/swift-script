@@ -9,8 +9,11 @@ struct SwiftScriptConfig: VerboseLoggableCommand {
         subcommands: [SwiftScriptConfigSet.self]
     )
 
+    var appEnv: AppEnv = .default
+
+
     func wrappedRun() async throws {
-        let config = try await AppConfig.load()
+        let config = try await appEnv.loadAppConfig()
 #if os(macOS)
         print(
             """
@@ -45,6 +48,9 @@ struct SwiftScriptConfigSet: VerboseLoggableCommand {
     @Flag(name: .long)
     var verbose: Bool = false
 
+    var appEnv: AppEnv = .default
+
+
 #if os(macOS)
     func wrappedRun() async throws {
 
@@ -54,7 +60,7 @@ struct SwiftScriptConfigSet: VerboseLoggableCommand {
         }
 
         printLog("Loading current configuration")
-        var config = try await AppConfig.load()
+        var config = try await appEnv.loadAppConfig()
 
         if let swiftVersion = swiftVersion {
             guard let version = Version(string: swiftVersion) else {
@@ -72,7 +78,7 @@ struct SwiftScriptConfigSet: VerboseLoggableCommand {
         }
 
         printLog("Saving updated configuration")
-        try await config.save()
+        try await appEnv.saveAppConfig(config)
 
     }
 #else
@@ -83,7 +89,7 @@ struct SwiftScriptConfigSet: VerboseLoggableCommand {
             return 
         }
 
-        var config = try await AppConfig.load()
+        var config = try await appEnv.loadAppConfig()
 
         if let swiftVersion = swiftVersion {
             guard let version = Version(string: swiftVersion) else {
@@ -93,7 +99,7 @@ struct SwiftScriptConfigSet: VerboseLoggableCommand {
             config.swiftVersion = version
         }
 
-        try await config.save()
+        try await appEnv.saveAppConfig(config)
 
     }
 #endif

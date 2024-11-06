@@ -13,6 +13,8 @@ import SwiftCommand
 struct SwiftScriptSearch: VerboseLoggableCommand {
     
     static let configuration: CommandConfiguration = .init(commandName: "search", shouldDisplay: false)
+
+    var appEnv: AppEnv = .default
     
     
     func wrappedRun() async throws {

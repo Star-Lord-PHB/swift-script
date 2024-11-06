@@ -2,23 +2,17 @@ import Foundation
 import ConcurrencyPlus
 
 
-extension AppPath {
-
-    static let processLockUrl = AppPath.appBaseUrl
-        .appendingCompat(path: "lock.lock")
-
-}
-
-
 final class ProcessLock: Sendable {
 
+    let path: URL 
     let fileLock: NSDistributedLock
 
-    init() {
-        guard let lock = NSDistributedLock(path: AppPath.processLockUrl.path) else {
+    init(path: URL = AppEnv.default.processLockUrl) {
+        guard let lock = NSDistributedLock(path: path.compactPath()) else {
             fatalError("Failed to create lock")
         }
         SignalHandler.registerCleanUp { lock.unlock() }
+        self.path = path
         self.fileLock = lock
     }
 
@@ -36,7 +30,7 @@ final class ProcessLock: Sendable {
                     
                     You can keep waiting or stop the current process by pressing Ctrl+C
                     If you are sure that no other process is running, you can manually remove \ 
-                    the lock file at \(AppPath.processLockUrl.compactPath(percentEncoded: false))
+                    the lock file at \(path.compactPath(percentEncoded: false))
                     """.yellow
                 )
                 warned = true

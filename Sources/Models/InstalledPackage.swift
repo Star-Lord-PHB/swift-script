@@ -61,20 +61,20 @@ struct InstalledPackage: Codable {
 }
 
 
-extension InstalledPackage {
+// extension InstalledPackage {
     
-    static func load() async throws -> [InstalledPackage] {
-        try await JSONDecoder().decode(
-            [InstalledPackage].self,
-            from: .read(contentsOf: AppPath.installedPackagesUrl)
-        )
-    }
+//     static func load() async throws -> [InstalledPackage] {
+//         try await JSONDecoder().decode(
+//             [InstalledPackage].self,
+//             from: .read(contentsOf: AppPath.installedPackagesUrl)
+//         )
+//     }
     
-    static func save(_ packages: [InstalledPackage]) async throws {
-        try await JSONEncoder().encode(packages).write(to: AppPath.installedPackagesUrl)
-    }
+//     static func save(_ packages: [InstalledPackage]) async throws {
+//         try await JSONEncoder().encode(packages).write(to: AppPath.installedPackagesUrl)
+//     }
     
-}
+// }
 
 
 extension InstalledPackage: CustomStringConvertible {

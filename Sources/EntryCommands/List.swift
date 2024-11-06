@@ -10,12 +10,15 @@ import FoundationPlus
 import SwiftCommand
 
 
-struct SwiftScriptList: AsyncParsableCommand {
+struct SwiftScriptList: VerboseLoggableCommand {
     
     static let configuration: CommandConfiguration = .init(commandName: "list")
+
+    var appEnv: AppEnv = .default
     
-    func run() async throws {
-        try await CMD.printRunnerDependencies()
+
+    func wrappedRun() async throws {
+        try await appEnv.printRunnerDependencies()
     }
     
 }
