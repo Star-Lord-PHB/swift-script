@@ -14,8 +14,8 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
     
     static let configuration: CommandConfiguration = .init(commandName: "install")
     
-    @Argument(help: "The package to install")
-    var package: String
+    @Argument(help: "The package to install", transform: URL.parse(_:))
+    var package: URL
     
     @OptionGroup
     var packageVersionSpecifier: PackageVersionSpecifierArguments
@@ -29,19 +29,22 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
     @Option(name: .customLong("Xbuild"), parsing: .singleValue, help: #"Pass flag through to "swift build" command"#)
     var buildArguments: [String] = []
 
+    @Flag(help: "If set, will not build the package after installation (NOT RECOMMENDED! Aimed only for faster testing)")
+    var noBuild: Bool = false
+
     var appEnv: AppEnv = .default
     
-    var exactVersion: String? { packageVersionSpecifier.exactVersion }
+    var exactVersion: Version? { packageVersionSpecifier.exactVersion }
     var branch: String? { packageVersionSpecifier.branch }
-    var upToNextMajorVersion: String? { packageVersionSpecifier.upToNextMajorVersion }
-    var upToNextMinorVersion: String? { packageVersionSpecifier.upToNextMinorVersion }
-    var upperBoundVersion: String? { packageVersionSpecifier.upperBoundVersion }
+    var upToNextMajorVersion: Version? { packageVersionSpecifier.upToNextMajorVersion }
+    var upToNextMinorVersion: Version? { packageVersionSpecifier.upToNextMinorVersion }
+    var upperBoundVersion: Version? { packageVersionSpecifier.upperBoundVersion }
     
     
     func validate() throws {
-        guard [exactVersion, branch, upToNextMajorVersion, upToNextMinorVersion].count(where: { $0 != nil }) <= 1 else {
-            try errorAbort(
-                "expect at most ONE option within `--exact`, `--from`, `--up-to-next-minor-from` and `--branch`"
+        guard packageVersionSpecifier.selfValidate() else {
+            throw CLIError(
+                reason: "expect at most ONE option within `--exact`, `--from`, `--up-to-next-minor-from` and `--branch`"
             )
         }
     }
@@ -51,7 +54,7 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
         
         try await appEnv.withProcessLock {
 
-            let newPackageIdentity = try appEnv.packageIdentity(of: package)
+            let newPackageIdentity = appEnv.packageIdentity(of: package)
             
             printLog("Package identity identified as \(newPackageIdentity)")
         
@@ -104,16 +107,16 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
             installedPackages.append(
                 .init(
                     identity: newPackageIdentity,
-                    url: .init(string: package)!,
+                    url: package,
                     libraries: newPackageProducts.libraries.map(to: \.name),
                     requirement: requirement
                 )
             )
             
-            registerCleanUp {
+            registerCleanUp { 
                 print("Restoring original package manifest and installed packages")
                 try? await originalPackageManifest.write(to: appEnv.runnerPackageManifestUrl)
-                try? await JSONEncoder().encode(originalPackages).write(to: appEnv.installedPackagesUrl)
+                try? await appEnv.saveInstalledPackages(originalPackages)
             }
             
             print("Saving updated installed packages")
@@ -121,8 +124,13 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
             print("Saving updating runner package manifest")
             try await appEnv.updatePackageManifest(installedPackages: installedPackages, config: config)
             
-            print("Building")
-            try await appEnv.buildRunnerPackage(arguments: buildArguments, verbose: true)
+            if noBuild {
+                print("Resolving (will not build since `--no-build` is set)")
+                try await appEnv.resolveRunnerPackage(verbose: verbose)
+            } else {
+                print("Building")
+                try await appEnv.buildRunnerPackage(arguments: buildArguments, verbose: true)
+            }
             
         }
         
@@ -132,19 +140,27 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
     private func extractRequirement() async throws -> InstalledPackage.Requirement {
         
         return if let exactVersion {
-            .exact(exactVersion)
+            .exact(exactVersion.description)
         } else if let branch {
             .branch(branch)
         } else if let upToNextMajorVersion {
-            try .range(from: upToNextMajorVersion, to: upperBoundVersion, option: .upToNextMajor)
+            try .range(from: upToNextMajorVersion.description, to: upperBoundVersion?.description, option: .upToNextMajor)
         } else if let upToNextMinorVersion {
-            try .range(from: upToNextMinorVersion, to: upperBoundVersion, option: .uptoNextMinor)
+            try .range(from: upToNextMinorVersion.description, to: upperBoundVersion?.description, option: .uptoNextMinor)
         } else {
-            try .range(
-                from: await appEnv.fetchLatestVersion(of: package, upTo: upperBoundVersion).description,
-                to: upperBoundVersion,
-                option: .upToNextMajor
-            )
+            if let upperBoundVersion {
+                try .range(
+                    from: await appEnv.fetchLatestVersion(of: package, upTo: .init(string: upperBoundVersion.description)).description,
+                    to: upperBoundVersion.description,
+                    option: .upToNextMajor
+                )
+            } else {
+                try .range(
+                    from: await appEnv.fetchLatestVersion(of: package).description,
+                    to: upperBoundVersion?.description,
+                    option: .upToNextMajor
+                )
+            }
         }
         
     }

@@ -17,11 +17,14 @@ struct SwiftScriptUninstall: VerboseLoggableCommand {
         aliases: ["remove", "rm"]
     )
     
-    @Argument
+    @Argument(transform: { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() })
     var identities: [String]
     
     @Option(name: .customLong("Xbuild"), parsing: .singleValue, help: #"Pass flag through to "swift build" command"#)
     var buildArguments: [String] = []
+
+    @Flag(help: "If set, will not build the package after installation (NOT RECOMMENDED! Aimed only for faster testing)")
+    var noBuild: Bool = false
 
     var appEnv: AppEnv = .default
 
@@ -31,23 +34,22 @@ struct SwiftScriptUninstall: VerboseLoggableCommand {
         try await appEnv.withProcessLock {
 
             printLog("Loading installed packages")
-            var installedPackages = try await appEnv.loadInstalledPackages()
-            var identitiesToRemove = Set(identities.map { $0.lowercased() })
+            let installedPackages = try await appEnv.loadInstalledPackages()
+            let identitiesToRemove = Set(identities)
             
-            let originalPackages = installedPackages
             printLog("Caching current runner package manifest")
             let originalPackageManifest = try await appEnv.loadPackageManifes()
-            
-            for (i, package) in installedPackages.enumerated()
-            where identitiesToRemove.contains(package.identity) {
-                identitiesToRemove.remove(package.identity)
-                installedPackages.remove(at: i)
+
+            let updatedPackages = installedPackages.filter { 
+                !identitiesToRemove.contains($0.identity) 
             }
-            
-            guard identitiesToRemove.count == 0 else {
-                try errorAbort("""
+
+            guard installedPackages.count - updatedPackages.count == identitiesToRemove.count else {
+                let notInstalledPackages = identitiesToRemove
+                    .subtracting(installedPackages.map(\.identity).toSet())
+                throw CLIError(reason: """
                     The following packages are not installed:
-                    \(identitiesToRemove.joined(separator: "\n"))
+                    \(notInstalledPackages.joined(separator: "\n"))
                     """
                 )
             }
@@ -60,16 +62,21 @@ struct SwiftScriptUninstall: VerboseLoggableCommand {
             registerCleanUp {
                 print("Restoring original package manifest and installed packages")
                 try? await originalPackageManifest.write(to: appEnv.runnerPackageManifestUrl)
-                try? await appEnv.saveInstalledPackages(originalPackages)
+                try? await appEnv.saveInstalledPackages(installedPackages)
             }
             
             print("Saving updated installed packages")
-            try await appEnv.saveInstalledPackages(installedPackages)
+            try await appEnv.saveInstalledPackages(updatedPackages)
             print("Saving updated runner package manifest")
-            try await appEnv.updatePackageManifest(installedPackages: installedPackages, config: config)
+            try await appEnv.updatePackageManifest(installedPackages: updatedPackages, config: config)
             
-            print("Building")
-            try await appEnv.buildRunnerPackage(arguments: buildArguments, verbose: true)
+            if noBuild {
+                print("Resolving (will not build since `--no-build` is set)")
+                try await appEnv.resolveRunnerPackage(verbose: verbose)
+            } else {
+                print("Building")
+                try await appEnv.buildRunnerPackage(arguments: buildArguments, verbose: true)
+            }
             
         }
         

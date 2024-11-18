@@ -18,7 +18,7 @@ struct SwiftScriptSearch: VerboseLoggableCommand {
     
     
     func wrappedRun() async throws {
-        try errorAbort("Not implemented yet")
+        throw CLIError(reason: "Not implemented yet")
     }
     
 }

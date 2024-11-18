@@ -44,18 +44,14 @@ extension PackageProducts {
         let outputFileUrl = packageUrl.appendingCompat(path: "otuput.txt")
         try await FileManager.default.createFile(at: outputFileUrl, replaceExisting: true)
         
-        guard
-            let _ = try await Command.findInPath(withName: "swift")?
-                .addArguments(
-                    "package",
-                    "--package-path", packageUrl.compactPath(percentEncoded: false),
-                    "describe", "--type", "json"
-                )
-                .setOutputs(.write(toFile: .init(outputFileUrl.compactPath())))
-                .status
-        else {
-            throw ValidationError("Fail to get package description")
-        }
+        try await Command.requireInPath("swift")
+            .addArguments(
+                "package",
+                "--package-path", packageUrl.compactPath(percentEncoded: false),
+                "describe", "--type", "json"
+            )
+            .setOutputs(.write(toFile: .init(outputFileUrl.compactPath())))
+            .wait()
         
         return try await JSONDecoder().decode(
             PackageProducts.self,

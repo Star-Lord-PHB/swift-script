@@ -7,7 +7,7 @@ import ArgumentParser
 extension AppEnv {
 
     func resolveRunnerPackage(verbose: Bool = false) async throws {
-        try await Command.findInPath(withName: "swift")?
+        try await Command.requireInPath("swift")
             .addArguments(
                 "package", "resolve",
                 "--package-path", runnerPackageUrl.compactPath(percentEncoded: false)
@@ -20,7 +20,7 @@ extension AppEnv {
         arguments: [String] = [],
         verbose: Bool = false
     ) async throws {
-        try await Command.findInPath(withName: "swift")?
+        try await Command.requireInPath("swift")
             .addArguments(
                 "build",
                 "--package-path", runnerPackageUrl.compactPath(percentEncoded: false),
@@ -31,10 +31,10 @@ extension AppEnv {
 
 
     func createNewPackage(at url: URL) async throws {
-        try await Command.findInPath(withName: "swift")?
+        try await Command.requireInPath("swift")
             .setCWD(.init(url.compactPath(percentEncoded: false)))
             .addArguments("package", "init")
-            .wait(hidingOutput: true)
+            .wait(printingOutput: false)
     }
 
 
@@ -43,13 +43,13 @@ extension AppEnv {
         upTo upperVersion: Version? = nil,
         verbose: Bool = false
     ) async throws -> Version {
-        let gitOutput = try await Command.findInPath(withName: "git")?
+        let gitOutput = try await Command.requireInPath("git")
             .addArguments("ls-remote", "--tag", packageUrl.absoluteString)
-            .output
+            .getOutput()
         if verbose {
-            print(gitOutput?.stdout ?? "")
+            print(gitOutput.stdout)
         }
-        let version = gitOutput?.stdout
+        let version = gitOutput.stdout
             .split(separator: "\n")
             .compactMap { $0.split(separator: "/").last }
             .compactMap { Version(string: String($0)) }
@@ -57,25 +57,6 @@ extension AppEnv {
             .max()
         guard let version else { throw ValidationError("Fail to find any version matched") }
         return version
-    }
-
-
-    func fetchLatestVersion(
-        of packageUrl: String,
-        upTo upperVersion: String? = nil,
-        verbose: Bool = false
-    ) async throws -> Version {
-        guard let url = URL(string: packageUrl) else {
-            throw ValidationError("Invalid url: \(packageUrl)")
-        }
-        if let upperVersion {
-            guard let upperVersion = Version(string: upperVersion) else {
-                throw ValidationError("Invalid version string: \(upperVersion)")
-            }
-            return try await fetchLatestVersion(of: url, upTo: upperVersion, verbose: verbose)
-        } else {
-            return try await fetchLatestVersion(of: url, verbose: verbose)
-        }
     }
 
 
@@ -95,7 +76,7 @@ extension AppEnv {
                 config: config
             )
 
-            try await Command.findInPath(withName: "swift")?
+            try await Command.requireInPath("swift")
                 .addArguments(
                     "package", "resolve",
                     "--package-path", tempFolderUrl.compactPath(percentEncoded: false)
@@ -119,19 +100,6 @@ extension AppEnv {
     }
 
 
-    func fetchPackageProducts(
-        of packageRemoteUrl: String,
-        requirement: InstalledPackage.Requirement,
-        config: AppConfig,
-        verbose: Bool = false
-    ) async throws -> PackageProducts {
-        guard let url = URL(string: packageRemoteUrl) else {
-            throw ValidationError("Invalid url: \(packageRemoteUrl)")
-        }
-        return try await fetchPackageProducts(of: url, requirement: requirement, config: config, verbose: verbose)
-    }
-
-
     func runExecutable(at executableUrl: URL, arguments: [String]) async throws {
         try await Command(executablePath: .init(executableUrl.compactPath(percentEncoded: false)))
             .addArguments(arguments)
@@ -140,7 +108,7 @@ extension AppEnv {
 
 
     func printRunnerDependencies() async throws {
-        try await Command.findInPath(withName: "swift")?
+        try await Command.requireInPath("swift")
             .addArguments(
                 "package", "show-dependencies",
                 "--package-path", runnerPackageUrl.compactPath(percentEncoded: false)
@@ -158,7 +126,7 @@ extension AppEnv {
             replaceExisting: true
         )
 
-        try await Command.findInPath(withName: "swift")?
+        try await Command.requireInPath("swift")
             .setCWD(.init(packageUrl.compactPath(percentEncoded: false)))
             .addArguments("package", "show-dependencies")
             .setOutputs(.write(toFile: .init(dependenciesOutputFileUrl.compactPath(percentEncoded: false))))
@@ -184,7 +152,7 @@ extension AppEnv {
             replaceExisting: true
         )
 
-        try await Command.findInPath(withName: "swift")?
+        try await Command.requireInPath("swift")
             .setCWD(.init(packageUrl.compactPath(percentEncoded: false)))
             .addArguments("package", "describe", "--type", "json")
             .setOutputs(
@@ -203,19 +171,28 @@ extension AppEnv {
     func fetchSwiftVersion() async throws -> Version {
         try await withTempFolder { folderUrl in
             try await createNewPackage(at: folderUrl)
-            guard
-                let versionStr = try await Command.findInPath(withName: "swift")?
-                    .setCWD(.init(folderUrl.compactPath(percentEncoded: false)))
-                    .addArguments("package", "tools-version")
-                    .output.stdout
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-            else { throw ValidationError("Fail to fetch swift version") }
+            let versionStr = try await Command.requireInPath("swift")
+                .setCWD(.init(folderUrl.compactPath(percentEncoded: false)))
+                .addArguments("package", "tools-version")
+                .getOutput().stdout
+                .trimmingCharacters(in: .whitespacesAndNewlines)
             guard let version = Version(string: versionStr) else {
                 throw ValidationError("Fail to parse swift version: \(versionStr)")
             }
             return version
         }
     }
+
+#if os(macOS)
+    func fetchMacosVersion() -> Version {
+        let version = ProcessInfo.processInfo.operatingSystemVersion
+        return Version(
+            major: version.majorVersion,
+            minor: version.minorVersion,
+            patch: version.patchVersion
+        )
+    }
+#endif
 
     private func grantPermission(forFileAt url: URL) async throws {
         if await FileManager.default.fileExistsAsync(at: url) {

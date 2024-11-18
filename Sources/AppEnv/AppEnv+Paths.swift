@@ -79,84 +79,8 @@ extension AppEnv {
 
     }
 
-    func packageIdentity(of packageUrl: String) throws -> String {
-        guard let url = URL(string: packageUrl) else {
-            throw ValidationError("Invalid url: \(packageUrl)")
-        }
-        return packageIdentity(of: url)
-    }
-
-    func packageCheckoutUrl(of packageUrl: URL) -> URL {
-
-        let pathExtension = packageUrl.pathExtension
-
-        return if pathExtension == "git" {
-            installedPackageCheckoutsUrl
-                .appendingCompat(path: packageUrl.deletingPathExtension().lastPathComponent)
-        } else {
-            installedPackageCheckoutsUrl
-                .appendingCompat(path: packageUrl.lastPathComponent)
-        }
-
-    }
-
-    func packageCheckoutUrl(of packageUrl: String) throws -> URL {
-        guard let url = URL(string: packageUrl) else {
-            throw ValidationError("Invalid url: \(packageUrl)")
-        }
-        return packageCheckoutUrl(of: url)
-    }
-
-}
-
-
-
-enum ScriptType {
-    case topLevel, mainEntry
-}
-
-
-
-extension ScriptType: CustomStringConvertible {
-    var description: String {
-        switch self {
-            case .topLevel: return "Top Level"
-            case .mainEntry: return "Custom Main Entry"
-        }
-    }
-}
-
-
-
-extension ScriptType {
-
-    static func of(fileAt url: URL) async throws -> ScriptType {
-
-        guard let scriptContent = try await String(data: .read(contentsOf: url), encoding: .utf8)
-        else {
-            fatalError("Fail to read contents of the script")
-        }
-
-        let syntax = Parser.parse(source: scriptContent)
-
-        let hasEntry = syntax.statements.lazy
-            .compactMap { codeBlockItem in
-                codeBlockItem.item.as(StructDeclSyntax.self)
-            }
-            .contains { structDecl in
-                structDecl.attributes.lazy
-                    .compactMap { attribute in
-                        attribute
-                            .as(AttributeSyntax.self)?
-                            .attributeName
-                            .as(IdentifierTypeSyntax.self)?
-                            .name.trimmed.text
-                    }
-                    .contains(where: { $0 == "main" })
-            }
-
-        return hasEntry ? .mainEntry : .topLevel
-
+    func packageCheckoutUrl(of packageIdentity: String) -> URL {
+        installedPackageCheckoutsUrl.appendingCompat(path: packageIdentity)
     }
 
 }

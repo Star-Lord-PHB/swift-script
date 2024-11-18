@@ -59,8 +59,6 @@ final class ProcessLock: Sendable {
         }
     }
 
-    static let shared: ProcessLock = .init()
-
 }
 
 

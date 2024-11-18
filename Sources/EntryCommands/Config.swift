@@ -37,12 +37,12 @@ struct SwiftScriptConfigSet: VerboseLoggableCommand {
 
     static let configuration: CommandConfiguration = .init(commandName: "set")
 
-    @Option
-    var swiftVersion: String?
+    @Option(transform: Version.parse(_:))
+    var swiftVersion: Version?
 
 #if os(macOS)
-    @Option
-    var macosVersion: String?
+    @Option(transform: Version.parse(_:))
+    var macosVersion: Version?
 #endif
     
     @Flag(name: .long)
@@ -63,18 +63,12 @@ struct SwiftScriptConfigSet: VerboseLoggableCommand {
         var config = try await appEnv.loadAppConfig()
 
         if let swiftVersion = swiftVersion {
-            guard let version = Version(string: swiftVersion) else {
-                try errorAbort("\(swiftVersion) is not a valid swift version")
-            }
-            printLog("Changing swift tools version from \(config.swiftVersion) to \(version)")
-            config.swiftVersion = version
+            printLog("Changing swift tools version from \(config.swiftVersion) to \(swiftVersion)")
+            config.swiftVersion = swiftVersion
         }
         if let macosVersion = macosVersion {
-            guard let version = Version(string: macosVersion) else {
-                try errorAbort("\(macosVersion) is not a vlid macOS version string")
-            }
-            printLog("Changing macOS min support version from \(config.macosVersion) to \(version)")
-            config.macosVersion = version
+            printLog("Changing macOS min support version from \(config.macosVersion) to \(macosVersion)")
+            config.macosVersion = macosVersion
         }
 
         printLog("Saving updated configuration")
@@ -92,11 +86,8 @@ struct SwiftScriptConfigSet: VerboseLoggableCommand {
         var config = try await appEnv.loadAppConfig()
 
         if let swiftVersion = swiftVersion {
-            guard let version = Version(string: swiftVersion) else {
-                try errorAbort("\(swiftVersion) is not a valid swift version")
-            }
-            printLog("Changing swift tools version from \(config.swiftVersion) to \(version)")
-            config.swiftVersion = version
+            printLog("Changing swift tools version from \(config.swiftVersion) to \(swiftVersion)")
+            config.swiftVersion = swiftVersion
         }
 
         try await appEnv.saveAppConfig(config)

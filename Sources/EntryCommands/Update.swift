@@ -14,7 +14,7 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
     
     static let configuration: CommandConfiguration = .init(commandName: "update")
     
-    @Argument
+    @Argument(transform: { $0.trimmingCharacters(in: .whitespaces).lowercased() })
     var package: String?
     
     @OptionGroup
@@ -32,6 +32,9 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
     @Flag(name: [.customShort("y"), .customLong("yes")])
     var noPrompt: Bool = false
 
+    @Flag(help: "If set, will not build the package after installation (NOT RECOMMENDED! Aimed only for faster testing)")
+    var noBuild: Bool = false
+
     var appEnv: AppEnv = .default
     
     
@@ -39,27 +42,33 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
         if package != nil && all {
             throw CleanExit.helpRequest(self)
         }
+        guard packageUpdateVersionSpec.selfValidate() else {
+            throw CLIError( 
+                reason: "expect at most ONE option within `--exact`, `--from`, `--up-to-next-minor-from` and `--branch`"
+            )
+        }
     }
     
     
     func wrappedRun() async throws {
         
-        if let package = package?.trimmingCharacters(in: .whitespaces) {
+        if let package {
             
             printLog("Loading installed packages")
             guard
                 let url = try await appEnv.loadInstalledPackages()
                     .first(where: { $0.identity == package })?.url
-            else { try errorAbort("Package \(package) is not installed") }
+            else { throw CLIError(reason: "Package \(package) is not installed") }
             
             var installCommand = SwiftScriptInstall(appEnv: appEnv)
-            installCommand.package = url.absoluteString
+            installCommand.package = url
             installCommand.packageVersionSpecifier = packageUpdateVersionSpec
             installCommand.buildArguments = buildArguments
             installCommand.verbose = verbose
             installCommand.forceReplace = true
+            installCommand.noBuild = noBuild
             
-            try await installCommand.run()
+            try await installCommand.wrappedRun()
             
         } else if all {
             
@@ -113,8 +122,13 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
                 print("Saving updated runner package manifest")
                 try await appEnv.updatePackageManifest(installedPackages: updatedPackages, config: config)
                 
-                print("Building")
-                try await appEnv.buildRunnerPackage(arguments: buildArguments, verbose: true)
+                if noBuild {
+                    print("Resolving (will not build since `--no-build` is set)")
+                    try await appEnv.resolveRunnerPackage(verbose: verbose)
+                } else {
+                    print("Building")
+                    try await appEnv.buildRunnerPackage(arguments: buildArguments, verbose: true)
+                }
                 
             }
             

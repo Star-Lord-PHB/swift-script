@@ -38,23 +38,34 @@ extension Optional {
 
 
 
-extension Command {
-    
-    func hideAllOutput() -> Command<Stdin, NullOutputDestination, NullOutputDestination> {
-        self.setStdout(.null).setStderr(.null)
-    }
-    
-    func wait(printingOutput: Bool = true) async throws {
-        if printingOutput {
-            let _ = try await self.status
+extension URL {
+
+    static func parse(_ string: String) throws -> URL {
+        if let url = URL(string: string) {
+            return url
         } else {
-            let _ = try await self.hideAllOutput().status
+            throw ValidationError("Invalid URL: \(string)")
         }
     }
-    
-    func wait(hidingOutput: Bool) async throws {
-        try await self.wait(printingOutput: !hidingOutput)
-    }
-    
+
 }
 
+
+struct StdStream: TextOutputStream {
+
+    private let fileHandle: FileHandle
+
+    func write(_ string: String) {
+        fileHandle.write(Data(string.utf8))
+    }
+
+    static let standardOutput = StdStream(fileHandle: .standardOutput)
+    static let standardError = StdStream(fileHandle: .standardError)
+
+}
+
+
+func printStdErr(_ items: Any..., separator: String = " ", terminator: String = "\n") {
+    var standardError = StdStream.standardError
+    print(items, separator: separator, terminator: terminator, to: &standardError)
+}

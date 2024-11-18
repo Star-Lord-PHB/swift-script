@@ -16,28 +16,31 @@ extension AppEnv {
             AppConfigCodingStructure.self,
             from: .read(contentsOf: configFileUrl)
         )
-        var systemVersion: Version {
-            let version = ProcessInfo.processInfo.operatingSystemVersion
-            return Version(
-                major: version.majorVersion, minor: version.minorVersion,
-                patch: version.patchVersion)
-        }
+#if os(macOS)
         let macosVersion =
             if let str = structure.macosVersion {
-                Version(string: str) ?? systemVersion
+                Version(string: str) ?? fetchMacosVersion()
             } else {
-                systemVersion
+                fetchMacosVersion()
             }
+#endif
         let swiftVersion =
             if let str = structure.swiftVersion {
                 try await Version(string: str).unwrap(or: { try await fetchSwiftVersion() })
             } else {
                 try await fetchSwiftVersion()
             }
+
+#if os(macOS)
         return .init(
             macosVersion: macosVersion,
             swiftVersion: swiftVersion
         )
+#else
+        return .init(
+            swiftVersion: swiftVersion
+        )
+#endif
 
     }
 
@@ -65,11 +68,14 @@ extension AppEnv {
     func loadResolvedDependencyVersionList() async throws -> [ResolvedDependencyVersion] {
 
         try await resolveRunnerPackage()
+        let actualInstalledPackageIdentities = try await loadInstalledPackages().map(\.identity).toSet()
 
         return try await JSONDecoder().decode(
             ResolvedDependencyVersionList.self,
             from: .read(contentsOf: runnerResolvedPackagesUrl)
-        ).dependencies
+        )
+        .dependencies
+        .filter { actualInstalledPackageIdentities.contains($0.identity) }
 
     }
 

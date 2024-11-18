@@ -61,22 +61,6 @@ struct InstalledPackage: Codable {
 }
 
 
-// extension InstalledPackage {
-    
-//     static func load() async throws -> [InstalledPackage] {
-//         try await JSONDecoder().decode(
-//             [InstalledPackage].self,
-//             from: .read(contentsOf: AppPath.installedPackagesUrl)
-//         )
-//     }
-    
-//     static func save(_ packages: [InstalledPackage]) async throws {
-//         try await JSONEncoder().encode(packages).write(to: AppPath.installedPackagesUrl)
-//     }
-    
-// }
-
-
 extension InstalledPackage: CustomStringConvertible {
     var description: String {
         """
@@ -169,4 +153,16 @@ extension Version: Comparable, Hashable {
         return lhs.patch < rhs.patch
     }
     
+}
+
+
+extension Version {
+
+    static func parse(_ string: String) throws -> Self {
+        guard let version = Self(string: string) else {
+            throw ValidationError("invalid sematic version string: \(string)")
+        }
+        return version
+    }
+
 }

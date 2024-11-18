@@ -31,6 +31,7 @@ let package = Package(
             dependencies: [
                 "SwiftScript",
                 .product(name: "Testing", package: "swift-testing"),
-                .product(name: "SwiftCommand", package: "swiftcommand"),]),
+                .product(name: "SwiftCommand", package: "swiftcommand"),],
+            resources: [.copy("AppFolderTemplates")]),
     ]
 )

@@ -17,7 +17,10 @@ struct SwiftScriptInfo: VerboseLoggableCommand {
     
     static let configuration: CommandConfiguration = .init(commandName: "info")
     
-    @Argument(help: "show detail information of a specified package")
+    @Argument(
+        help: "show detail information of a specified package",
+        transform: {  $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+    )
     var package: String
     
     @Flag(name: .long)
@@ -26,16 +29,14 @@ struct SwiftScriptInfo: VerboseLoggableCommand {
     var appEnv: AppEnv = .default
     
 
-    mutating func wrappedRun() async throws {
+    func wrappedRun() async throws {
         
-        package = package.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        
-        let packageCheckoutPath = try appEnv.packageCheckoutUrl(of: package)
+        let packageCheckoutPath = appEnv.packageCheckoutUrl(of: package)
         
         try await appEnv.withProcessLock {
             
             guard await FileManager.default.fileExistsAsync(at: packageCheckoutPath) else {
-                try errorAbort("Package \(package) is not installed")
+                throw CLIError(reason: "Package \(package) is not installed")
             }
             
             printLog("Loading metadata of package \(package)")
@@ -43,7 +44,7 @@ struct SwiftScriptInfo: VerboseLoggableCommand {
             guard
                 let packageDescription = try await appEnv.loadInstalledPackages()
                     .first(where: { $0.identity == package })
-            else { try errorAbort("Package \(package) is not installed") }
+            else { throw CLIError(reason: "Package \(package) is not installed") }
             
             printLog("Loading dependencies of package \(package)")
             
@@ -62,7 +63,7 @@ struct SwiftScriptInfo: VerboseLoggableCommand {
                 let resolvedVersion = try await appEnv.loadResolvedDependencyVersionList()
                     .first(where: { $0.identity == package })?
                     .version
-            else { try errorAbort("Package \(package) is not installed") }
+            else { throw CLIError(reason: "Package \(package) is not installed") }
             
             let infoStr = """
                 

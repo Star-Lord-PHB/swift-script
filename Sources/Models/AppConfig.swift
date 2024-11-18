@@ -12,7 +12,9 @@ import CodableMacro
 
 struct AppConfig: Equatable {
     
+#if os(macOS)
     var macosVersion: Version
+#endif
     var swiftVersion: Version
     
 }

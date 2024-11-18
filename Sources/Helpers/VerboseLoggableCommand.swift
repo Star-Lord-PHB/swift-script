@@ -32,27 +32,47 @@ extension VerboseLoggableCommand {
 
 
     mutating func run() async throws {
+
         do {
+
             SignalHandler.startSignalListening()
+
             let localSelf = SendableWrapper(value: self)
             let task = Task {
                 var command = localSelf.value
                 try await command.wrappedRun()
             }
+
             SignalHandler.registerTask(task)
             try await task.waitThrowing()
+
             await normalCleanUp()
-        } catch let error as ExitCode where error.isSuccess {
+
+            return 
+
+        } catch let error as ExitCode where error == .success {
             await normalCleanUp()
-            return // Do nothing
+            return          // Do nothing
+        } catch let error as CLIError where error.code == 0 {
+            await normalCleanUp()
+            return          // Do nothing
+        } catch let error as CleanExit {
+            await normalCleanUp()
+            throw error     // Do nothing
         } catch {
-            print("Error: \(error)".red)
-            if interruptCleanUpOperations.isNotEmpty {
-                print("Cleaning up...")
-                await interruptCleanUp()
+            let code = switch error {
+                case let error as NSError: error.code.int32Val
+                case let error as ExitCode: error.rawValue
+                case let error as CLIError: error.code.int32Val
+                case let error as ExternalCommandError: error.code
+                default: ExitCode.failure.rawValue
             }
-            throw ExitCode.failure
+            
+            printStdErr("Error: \(error.localizedDescription)".red)
+            await interruptCleanUp()
+            throw ExitCode(code)
         }
+
     }
     
     
@@ -64,6 +84,8 @@ extension VerboseLoggableCommand {
     
     
     private func interruptCleanUp() async {
+        guard interruptCleanUpOperations.isNotEmpty else { return }
+        print("Cleaning up...")
         for operation in interruptCleanUpOperations.reversed() {
             await operation()
         }
@@ -78,12 +100,7 @@ extension VerboseLoggableCommand {
     
     
     func warningLog(_ message: String) {
-        print(message.yellow)
-    }
-    
-    
-    func errorAbort(_ reason: String) throws -> Never {
-        throw ValidationError(reason)
+        printStdErr(message.yellow)
     }
     
     
@@ -105,7 +122,7 @@ extension VerboseLoggableCommand {
             normalCleanUpOperations.append(operation)
         }
     }
-    
+
 }
 
 

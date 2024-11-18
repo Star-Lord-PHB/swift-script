@@ -14,8 +14,12 @@ struct SwiftScriptRun: VerboseLoggableCommand {
     
     static let configuration: CommandConfiguration = .init(commandName: "run")
     
-    @Argument(help: "path to the script", completion: .file(extensions: ["swift"]))
-    var script: String
+    @Argument(
+        help: "path to the script", 
+        completion: .file(extensions: ["swift"]),
+        transform: URL.init(fileURLWithPath:)
+    )
+    var scriptPath: URL
     
     @Argument(parsing: .allUnrecognized, help: "Pass arguments through to the script")
     var arguments: [String] = []
@@ -29,12 +33,10 @@ struct SwiftScriptRun: VerboseLoggableCommand {
     var appEnv: AppEnv = .default
 
     
-    mutating func wrappedRun() async throws {
-        
-        let scriptUrl = URL(fileURLWithPath: script)
+    func wrappedRun() async throws {
         
         printLog("Identifying type of script")
-        let scriptType = try await ScriptType.of(fileAt: scriptUrl)
+        let scriptType = try await ScriptType.of(fileAt: scriptPath)
         printLog("Script type identified as \"\(scriptType)\"")
         
         let scriptBuildUrl = appEnv.scriptBuildUrl(ofType: scriptType)
@@ -51,7 +53,7 @@ struct SwiftScriptRun: VerboseLoggableCommand {
             printLog("Cleaning old script")
             try await appEnv.cleanOldScripts()
             printLog("Copying script to build path")
-            try await FileManager.default.copy(scriptUrl, to: scriptBuildUrl)
+            try await FileManager.default.copy(scriptPath, to: scriptBuildUrl)
             
             printLog("Building runner with arguments: \(swiftArguments)")
             try await appEnv.buildRunnerPackage(arguments: swiftArguments, verbose: verbose)
