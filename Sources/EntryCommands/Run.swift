@@ -44,7 +44,7 @@ struct SwiftScriptRun: VerboseLoggableCommand {
         printLog("Allocated executation path: \(scriptExecUrl.compactPath(percentEncoded: false))")
         
         registerCleanUp(when: .always) { [verbose] in
-            if verbose { print("Cleaning script executable".skyBlue) }
+            if verbose { printFromStart("Cleaning script executable".skyBlue) }
             try? await FileManager.default.remove(at: scriptExecUrl)
         }
         

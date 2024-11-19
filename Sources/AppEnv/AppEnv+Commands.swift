@@ -48,8 +48,9 @@ extension AppEnv {
             .addArguments("ls-remote", "--tags", remoteUrl.absoluteString)
             .getOutput()
         if verbose {
-            print(gitOutput.stdout)
+            printFromStart(gitOutput.stdout)
         }
+        try Task.checkCancellation()
         return gitOutput.stdout
             .split(separator: "\n")
             .compactMap { $0.split(separator: "/").last }
@@ -88,7 +89,11 @@ extension AppEnv {
                 config: loadAppConfig()
             )
 
+            try Task.checkCancellation()
+
             try await resolvePackage(at: tempFolderUrl, verbose: verbose)
+
+            try Task.checkCancellation()
 
             let packageCheckoutUrl = tempFolderUrl
                 .appendingCompat(path: ".build/checkouts/")
@@ -100,6 +105,7 @@ extension AppEnv {
             )
 
             if includeDependencies {
+                try Task.checkCancellation()
                 let dependencyText = try await loadPackageDependenciesText(of: packageCheckoutUrl)
                 return .init(from: description, url: remoteUrl, dependencyText: dependencyText)
             } else {
@@ -126,11 +132,15 @@ extension AppEnv {
                 config: loadAppConfig()
             )
 
+            try Task.checkCancellation()
+
             try await resolvePackage(at: tempFolderUrl, verbose: verbose)
 
             let packageCheckoutUrl = tempFolderUrl
                 .appendingCompat(path: ".build/checkouts/")
                 .appendingCompat(path: packageIdentity(of: packageRemoteUrl))
+
+            try Task.checkCancellation()
 
             return try await loadPackageDescription(
                 of: packageCheckoutUrl, 
@@ -163,6 +173,8 @@ extension AppEnv {
 
         try await resolvePackage(at: packageUrl)
 
+        try Task.checkCancellation()
+
         let data = try await Command.requireInPath("swift")
             .setCWD(.init(packageUrl.compactPath(percentEncoded: false)))
             .addArguments("package", "show-dependencies")
@@ -191,6 +203,7 @@ extension AppEnv {
     func fetchSwiftVersion() async throws -> Version {
         try await withTempFolder { folderUrl in
             try await createNewPackage(at: folderUrl)
+            try Task.checkCancellation()
             let versionStr = try await Command.requireInPath("swift")
                 .setCWD(.init(folderUrl.compactPath(percentEncoded: false)))
                 .addArguments("package", "tools-version")

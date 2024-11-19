@@ -12,24 +12,26 @@ extension AppEnv {
 
     func loadAppConfig() async throws -> AppConfig {
 
+        try Task.checkCancellation()
+
         let structure = try await JSONDecoder().decode(
             AppConfigCodingStructure.self,
             from: .read(contentsOf: configFileUrl)
         )
 #if os(macOS)
-        let macosVersion =
-            if let str = structure.macosVersion {
-                Version(string: str) ?? fetchMacosVersion()
-            } else {
-                fetchMacosVersion()
-            }
+        try Task.checkCancellation()
+        let macosVersion = if let str = structure.macosVersion {
+            Version(string: str) ?? fetchMacosVersion()
+        } else {
+            fetchMacosVersion()
+        }
 #endif
-        let swiftVersion =
-            if let str = structure.swiftVersion {
-                try await Version(string: str).unwrap(or: { try await fetchSwiftVersion() })
-            } else {
-                try await fetchSwiftVersion()
-            }
+        try Task.checkCancellation()
+        let swiftVersion = if let str = structure.swiftVersion {
+            try await Version(string: str).unwrap(or: { try await fetchSwiftVersion() })
+        } else {
+            try await fetchSwiftVersion()
+        }
 
 #if os(macOS)
         return .init(
@@ -46,6 +48,8 @@ extension AppEnv {
 
     func saveAppConfig(_ config: AppConfig) async throws {
 
+        try Task.checkCancellation()
+
         let structure = AppConfigCodingStructure(
             swiftVersion: config.swiftVersion.description,
             macosVersion: config.macosVersion.description
@@ -55,20 +59,24 @@ extension AppEnv {
     }
 
     func loadInstalledPackages() async throws -> [InstalledPackage] {
-        try await JSONDecoder().decode(
+        try Task.checkCancellation()
+        return try await JSONDecoder().decode(
             [InstalledPackage].self,
             from: .read(contentsOf: installedPackagesUrl)
         )
     }
 
     func saveInstalledPackages(_ packages: [InstalledPackage]) async throws {
-        try await JSONEncoder().encode(packages).write(to: installedPackagesUrl)
+        try Task.checkCancellation()
+        return try await JSONEncoder().encode(packages).write(to: installedPackagesUrl)
     }
 
     func loadResolvedDependencyVersionList() async throws -> [ResolvedDependencyVersion] {
 
         try await resolveRunnerPackage()
         let actualInstalledPackageIdentities = try await loadInstalledPackages().map(\.identity).toSet()
+
+        try Task.checkCancellation()
 
         return try await JSONDecoder().decode(
             ResolvedDependencyVersionList.self,
@@ -89,7 +97,8 @@ extension AppEnv {
         installedPackages: [InstalledPackage],
         config: AppConfig
     ) async throws {
-        let manifest = try await PackageManifestTemplate.makeRunnerPackageManifest(
+        try Task.checkCancellation()
+        let manifest = PackageManifestTemplate.makeRunnerPackageManifest(
             installedPackages: installedPackages,
             config: config
         )
@@ -97,7 +106,8 @@ extension AppEnv {
     }
 
     func loadPackageManifes() async throws -> Data {
-        try await .read(contentsOf: runnerPackageManifestUrl)
+        try Task.checkCancellation()
+        return try await .read(contentsOf: runnerPackageManifestUrl)
     }
 
     func createTempPackage(
@@ -107,18 +117,21 @@ extension AppEnv {
         config: AppConfig
     ) async throws {
         try await createNewPackage(at: url)
-        let manifest = try await PackageManifestTemplate.makeTempPackageManifest(
+        let manifest = PackageManifestTemplate.makeTempPackageManifest(
             packageUrl: packageUrl,
             requirement: requirement,
             config: config
         )
+        try Task.checkCancellation()
         try await Data(manifest.utf8).write(to: url.appendingCompat(path: "Package.swift"))
     }
 
 
     func cleanOldScripts() async throws {
+        try Task.checkCancellation()
         let files = try await FileManager.default.directoryEntries(at: runnerPackageUrl.appendingCompat(path: "Sources"))
         for url in files {
+            try Task.checkCancellation()
             try await FileManager.default.remove(at: url)
         }
     }

@@ -50,7 +50,7 @@ struct SwiftScriptSearch: VerboseLoggableCommand {
         }
 
         if showDependencies {
-            print("""
+            printFromStart("""
 
                 \("Identity".green): \(packageFullDescription.identity)
                 \("Name".green): \(packageFullDescription.name)
@@ -63,7 +63,7 @@ struct SwiftScriptSearch: VerboseLoggableCommand {
                 """
             )
         } else {
-            print("""
+            printFromStart("""
 
                 \("Identity".green): \(packageFullDescription.identity)
                 \("Name".green): \(packageFullDescription.name)

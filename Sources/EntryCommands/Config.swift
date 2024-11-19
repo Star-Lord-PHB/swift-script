@@ -15,14 +15,14 @@ struct SwiftScriptConfig: VerboseLoggableCommand {
     func wrappedRun() async throws {
         let config = try await appEnv.loadAppConfig()
 #if os(macOS)
-        print(
+        printFromStart(
             """
             swift tools version: \(config.swiftVersion)
             macOS min support version: \(config.macosVersion)
             """
         )
 #else
-        print(
+        printFromStart(
             """
             swift tools version: \(config.swiftVersionStr)
             """
@@ -79,7 +79,7 @@ struct SwiftScriptConfigSet: VerboseLoggableCommand {
     func wrappedRun() async throws {
         
         guard swiftVersion != nil else {
-            print("No config update specified")
+            printFromStart("No config update specified")
             return 
         }
 

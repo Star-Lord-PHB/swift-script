@@ -11,7 +11,6 @@ final class ProcessLock: Sendable {
         guard let lock = NSDistributedLock(path: path.compactPath()) else {
             fatalError("Failed to create lock")
         }
-        SignalHandler.registerCleanUp { lock.unlock() }
         self.path = path
         self.fileLock = lock
     }
@@ -21,7 +20,7 @@ final class ProcessLock: Sendable {
         var warned = false
         while await !fileLock.try() {
             if !warned && Date().timeIntervalSince(startTime) > 30 {
-                print("""
+                printFromStart("""
                     Warning: waiting for lock for more than 30 seconds
                     
                     It might be caused by one of the following reasons:

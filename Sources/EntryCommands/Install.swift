@@ -73,7 +73,7 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
                 .firstIndex(where: { $0.identity == newPackageIdentity }) {
                 
                 defer {
-                    print("Removing package \(newPackageIdentity)")
+                    printFromStart("Removing package \(newPackageIdentity)")
                     installedPackages.remove(at: conflictPackageIndex)
                 }
                 
@@ -85,7 +85,7 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
                 
                 let input = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                 guard input == "y" || input == "yes" else {
-                    print("Aborted")
+                    printFromStart("Aborted")
                     throw ExitCode.success
                 }
                 
@@ -94,9 +94,9 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
             printLog("Calculating version requirement")
             let requirement = try await extractRequirement(packageRemoteUrl)
             
-            print("Version requirement extracted as: \(requirement)")
+            printFromStart("Version requirement extracted as: \(requirement)")
             
-            print("Fetching products of package \(newPackageIdentity)")
+            printFromStart("Fetching products of package \(newPackageIdentity)")
             let newPackageProducts = try await appEnv.fetchPackageProducts(
                 of: packageRemoteUrl,
                 requirement: requirement
@@ -114,21 +114,21 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
             )
             
             registerCleanUp { 
-                print("Restoring original package manifest and installed packages")
+                printFromStart("Restoring original package manifest and installed packages")
                 try? await originalPackageManifest.write(to: appEnv.runnerPackageManifestUrl)
                 try? await appEnv.saveInstalledPackages(originalPackages)
             }
             
-            print("Saving updated installed packages")
+            printFromStart("Saving updated installed packages")
             try await appEnv.saveInstalledPackages(installedPackages)
-            print("Saving updating runner package manifest")
+            printFromStart("Saving updating runner package manifest")
             try await appEnv.updatePackageManifest(installedPackages: installedPackages, config: config)
             
             if noBuild {
-                print("Resolving (will not build since `--no-build` is set)")
+                printFromStart("Resolving (will not build since `--no-build` is set)")
                 try await appEnv.resolveRunnerPackage(verbose: verbose)
             } else {
-                print("Building")
+                printFromStart("Building")
                 try await appEnv.buildRunnerPackage(arguments: buildArguments, verbose: true)
             }
             
@@ -156,7 +156,7 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
             } else {
                 throw CLIError(reason: "Package \(package) is not found in swift package index")
             }
-            print("Found package \(package) with remote url: \(packageRemoteUrl)")
+            printFromStart("Found package \(package) with remote url: \(packageRemoteUrl)")
         }
 
         return (newPackageIdentity, packageRemoteUrl)

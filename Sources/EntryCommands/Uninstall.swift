@@ -57,24 +57,24 @@ struct SwiftScriptUninstall: VerboseLoggableCommand {
             printLog("Loading configuration")
             let config = try await appEnv.loadAppConfig()
             
-            print("Removing \(identities.joined(separator: ", "))")
+            printFromStart("Removing \(identities.joined(separator: ", "))")
             
             registerCleanUp {
-                print("Restoring original package manifest and installed packages")
+                printFromStart("Restoring original package manifest and installed packages")
                 try? await originalPackageManifest.write(to: appEnv.runnerPackageManifestUrl)
                 try? await appEnv.saveInstalledPackages(installedPackages)
             }
             
-            print("Saving updated installed packages")
+            printFromStart("Saving updated installed packages")
             try await appEnv.saveInstalledPackages(updatedPackages)
-            print("Saving updated runner package manifest")
+            printFromStart("Saving updated runner package manifest")
             try await appEnv.updatePackageManifest(installedPackages: updatedPackages, config: config)
             
             if noBuild {
-                print("Resolving (will not build since `--no-build` is set)")
+                printFromStart("Resolving (will not build since `--no-build` is set)")
                 try await appEnv.resolveRunnerPackage(verbose: verbose)
             } else {
-                print("Building")
+                printFromStart("Building")
                 try await appEnv.buildRunnerPackage(arguments: buildArguments, verbose: true)
             }
             

@@ -24,7 +24,7 @@ enum PackageManifestTemplate {
     static func makeRunnerPackageManifest(
         installedPackages: [InstalledPackage],
         config: AppConfig
-    ) async throws -> String {
+    ) -> String {
         
         #"""
         // swift-tools-version: \#(config.swiftVersion)
@@ -68,7 +68,7 @@ enum PackageManifestTemplate {
         packageUrl: URL,
         requirement: InstalledPackage.Requirement,
         config: AppConfig
-    ) async throws -> String {
+    ) -> String {
         let package = InstalledPackage(
             identity: "",
             url: packageUrl,

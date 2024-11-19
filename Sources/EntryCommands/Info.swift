@@ -75,7 +75,7 @@ struct SwiftScriptInfo: VerboseLoggableCommand {
                 printLog("Loading dependencies of package \(package)")
                 let dependenciesStr = try await appEnv.loadPackageDependenciesText(of: packageCheckoutPath)
                 
-                print("""
+                printFromStart("""
                     
                     \("Package identity:".green) \(package)
                     \("Package name:".green) \(packageDescription.name)
@@ -92,7 +92,7 @@ struct SwiftScriptInfo: VerboseLoggableCommand {
 
             } else {
 
-                print("""
+                printFromStart("""
                     
                     \("Package identity:".green) \(package)
                     \("Package name:".green) \(packageDescription.name)

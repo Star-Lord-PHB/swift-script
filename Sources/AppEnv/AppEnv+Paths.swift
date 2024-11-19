@@ -39,6 +39,7 @@ extension AppEnv {
     }
 
     func makeTempFolder() async throws -> URL {
+        try Task.checkCancellation()
         let url = tempUrl.appendingCompat(path: UUID().uuidString)
         try await FileManager.default.createDirectory(at: url)
         return url
@@ -47,6 +48,7 @@ extension AppEnv {
     func withTempFolder<R>(operation: (URL) async throws -> R) async throws -> R {
         let url = try await makeTempFolder()
         do {
+            try Task.checkCancellation()
             let result = try await operation(url)
             try await FileManager.default.remove(at: url)
             return result
@@ -57,11 +59,10 @@ extension AppEnv {
     }
 
     func scriptBuildUrl(ofType type: ScriptType) -> URL {
-        let name =
-            switch type {
-                case .mainEntry: "Runner.swift"
-                case .topLevel: "main.swift"
-            }
+        let name = switch type {
+            case .mainEntry: "Runner.swift"
+            case .topLevel: "main.swift"
+        }
         return runnerPackageUrl
             .appendingCompat(path: "Sources")
             .appendingCompat(path: name)

@@ -41,13 +41,13 @@ extension VerboseLoggableCommand {
             let task = Task {
                 var command = localSelf.value
                 try await command.wrappedRun()
+                try Task.checkCancellation()
             }
 
             SignalHandler.registerTask(task)
             try await task.waitThrowing()
 
             await normalCleanUp()
-
             return 
 
         } catch let error as ExitCode where error == .success {
@@ -59,6 +59,15 @@ extension VerboseLoggableCommand {
         } catch let error as CleanExit {
             await normalCleanUp()
             throw error     // Do nothing
+        } catch _ as CancellationError {
+            printStdErr("\nUser Aborted".red)
+            await interruptCleanUp()
+            let signal = SignalHandler.signal.withLock { $0 }
+            throw if signal != -1 {
+                ExitCode(128 + signal)
+            } else {
+                ExitCode.failure
+            }
         } catch {
             let code = switch error {
                 case let error as NSError: error.code.int32Val
@@ -66,8 +75,7 @@ extension VerboseLoggableCommand {
                 case let error as CLIError: error.code.int32Val
                 case let error as ExternalCommandError: error.code
                 default: ExitCode.failure.rawValue
-            }
-            
+            }   
             printStdErr("Error: \(error.localizedDescription)".red)
             await interruptCleanUp()
             throw ExitCode(code)
@@ -85,16 +93,18 @@ extension VerboseLoggableCommand {
     
     private func interruptCleanUp() async {
         guard interruptCleanUpOperations.isNotEmpty else { return }
-        print("Cleaning up...")
-        for operation in interruptCleanUpOperations.reversed() {
-            await operation()
+        try? await withLoadingIndicator("Cleaning up...") {
+            for operation in interruptCleanUpOperations.reversed() {
+                await operation()
+            }
+            try await Task.sleep(nanoseconds: 1_000_000_000)
         }
     }
     
     
     func printLog(_ message: String) {
         if verbose {
-            print(message.skyBlue)
+            printFromStart(message.skyBlue)
         }
     }
     
@@ -110,7 +120,6 @@ extension VerboseLoggableCommand {
     ) {
         if mode == .always || mode == .interrupt {
             interruptCleanUpOperations.append(operation)
-            SignalHandler.registerCleanUp(operation: operation)
         }
         if mode == .always || mode == .normalExit {
             normalCleanUpOperations.append(operation)

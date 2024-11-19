@@ -77,6 +77,11 @@ func printOverlapping(_ message: String) {
 }
 
 
+func printFromStart(_ message: String) {
+    print("\u{001B}[0G\(message)")
+}
+
+
 func withLoadingIndicator<R>(_ message: String, operation: () async throws -> R) async throws -> R {
     let loadingTask = Task { 
         try await printLoading(message)

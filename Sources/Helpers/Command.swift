@@ -20,7 +20,15 @@ extension Command {
     func wait() async throws {
 
         let process = try self.spawn()
-        let status = try await process.status
+        let wrapper = SendableWrapper(value: process)
+
+        let status = try await withTaskCancellationHandler {
+            try await process.status
+        } onCancel: { 
+            wrapper.value.interrupt()
+        }
+
+        try Task.checkCancellation()
 
         guard !status.terminatedSuccessfully else { return }
 
@@ -67,19 +75,37 @@ extension Command where Stdout == UnspecifiedOutputDestination {
 extension Command {
 
     func getOutput() async throws -> ProcessOutput where Stdout == PipeOutputDestination {
-        let output = try await self.output
+
+        let process = try SendableWrapper(value: self.spawn())
+
+        let output = try await withTaskCancellationHandler {
+            try await process.value.output
+        } onCancel: {
+            process.value.interrupt()
+        }
+
+        try Task.checkCancellation()
+
         guard !output.status.terminatedSuccessfully else { return output }
+
         throw ExternalCommandError(
             command: self.executablePath.string,
             args: self.arguments,
             code: output.status.exitCode ?? ExitCode.failure.rawValue,
             stderr: output.stderr ?? ""
         )
+        
     }
 
 
     func getOutput() async throws -> ProcessOutput where Stdout == UnspecifiedOutputDestination {
-        let output = try await self.output
+        let process = try SendableWrapper(value: self.setOutputs(.pipe).spawn())
+        let output = try await withTaskCancellationHandler {
+            try await process.value.output
+        } onCancel: {
+            process.value.interrupt()
+        }
+        try Task.checkCancellation()
         guard !output.status.terminatedSuccessfully else { return output }
         throw ExternalCommandError(
             command: self.executablePath.string,
@@ -99,6 +125,7 @@ extension Command {
             try await self
                 .setOutputs(.write(toFile: .init(tempFileUrl.compactPath(percentEncoded: false))))
                 .wait()
+            try Task.checkCancellation()
             return try await .read(contentsOf: tempFileUrl)
         } finally: {
             if removeTempFile {

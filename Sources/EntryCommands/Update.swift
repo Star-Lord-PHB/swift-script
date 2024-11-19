@@ -89,11 +89,11 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
                 }
                 
                 guard modifiedPackages.isNotEmpty else {
-                    print("No updatable packages found")
+                    printFromStart("No updatable packages found")
                     throw ExitCode.success
                 }
                 
-                print("""
+                printFromStart("""
                     Package requirements will be updated as follow:
                     \(
                         modifiedPackages
@@ -107,7 +107,7 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
                     print("Proceed? (y/n): ", terminator: "")
                     let input = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                     guard input == "y" || input == "yes" else {
-                        print("Aborted")
+                        printFromStart("Aborted")
                         throw ExitCode.success
                     }
                 }
@@ -117,16 +117,16 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
                     try? await appEnv.saveInstalledPackages(originalPackages)
                 }
                 
-                print("Saving updated installed packages")
+                printFromStart("Saving updated installed packages")
                 try await appEnv.saveInstalledPackages(updatedPackages)
-                print("Saving updated runner package manifest")
+                printFromStart("Saving updated runner package manifest")
                 try await appEnv.updatePackageManifest(installedPackages: updatedPackages, config: config)
                 
                 if noBuild {
-                    print("Resolving (will not build since `--no-build` is set)")
+                    printFromStart("Resolving (will not build since `--no-build` is set)")
                     try await appEnv.resolveRunnerPackage(verbose: verbose)
                 } else {
-                    print("Building")
+                    printFromStart("Building")
                     try await appEnv.buildRunnerPackage(arguments: buildArguments, verbose: true)
                 }
                 
