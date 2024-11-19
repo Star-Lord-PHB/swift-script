@@ -61,7 +61,7 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
             else { throw CLIError(reason: "Package \(package) is not installed") }
             
             var installCommand = SwiftScriptInstall(appEnv: appEnv)
-            installCommand.package = url
+            installCommand.package = url.absoluteString
             installCommand.packageVersionSpecifier = packageUpdateVersionSpec
             installCommand.buildArguments = buildArguments
             installCommand.verbose = verbose

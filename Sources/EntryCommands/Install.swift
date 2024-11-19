@@ -14,8 +14,11 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
     
     static let configuration: CommandConfiguration = .init(commandName: "install")
     
-    @Argument(help: "The package to install", transform: URL.parse(_:))
-    var package: URL
+    @Argument(
+        help: "The package to install (identity or url of the package)", 
+        transform: { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+    )
+    var package: String
     
     @OptionGroup
     var packageVersionSpecifier: PackageVersionSpecifierArguments
@@ -51,12 +54,10 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
     
     
     func wrappedRun() async throws {
+
+        let (newPackageIdentity, packageRemoteUrl) = try await resolveIdentityAndUrl()
         
         try await appEnv.withProcessLock {
-
-            let newPackageIdentity = packageIdentity(of: package)
-            
-            printLog("Package identity identified as \(newPackageIdentity)")
         
             printLog("Loading installed packages")
             var installedPackages = try await appEnv.loadInstalledPackages()
@@ -91,13 +92,13 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
             }
             
             printLog("Calculating version requirement")
-            let requirement = try await extractRequirement()
+            let requirement = try await extractRequirement(packageRemoteUrl)
             
             print("Version requirement extracted as: \(requirement)")
             
             print("Fetching products of package \(newPackageIdentity)")
             let newPackageProducts = try await appEnv.fetchPackageProducts(
-                of: package,
+                of: packageRemoteUrl,
                 requirement: requirement
             )
             
@@ -106,7 +107,7 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
             installedPackages.append(
                 .init(
                     identity: newPackageIdentity,
-                    url: package,
+                    url: packageRemoteUrl,
                     libraries: newPackageProducts.libraries.map(to: \.name),
                     requirement: requirement
                 )
@@ -134,9 +135,36 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
         }
         
     }
+
+
+    private func resolveIdentityAndUrl() async throws -> (String, URL) {
+
+        let packageRemoteUrl: URL 
+        let newPackageIdentity: String
+        
+        if let url = URL(string: package), url.scheme != nil {
+            printLog("Input identified as package URL")
+            packageRemoteUrl = url
+            newPackageIdentity = packageIdentity(of: packageRemoteUrl)
+            printLog("Package identity identified as \(newPackageIdentity)")
+        } else {
+            printLog("Input identified as package identity")
+            printLog("Searching package \(package) in swift package index")
+            newPackageIdentity = package
+            if let url = try await appEnv.searchPackage(of: package) {
+                packageRemoteUrl = url
+            } else {
+                throw CLIError(reason: "Package \(package) is not found in swift package index")
+            }
+            print("Found package \(package) with remote url: \(packageRemoteUrl)")
+        }
+
+        return (newPackageIdentity, packageRemoteUrl)
+
+    }
     
     
-    private func extractRequirement() async throws -> InstalledPackage.Requirement {
+    private func extractRequirement(_ remoteUrl: URL) async throws -> InstalledPackage.Requirement {
         
         return if let exactVersion {
             .exact(exactVersion.description)
@@ -149,13 +177,13 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
         } else {
             if let upperBoundVersion {
                 try .range(
-                    from: await appEnv.fetchLatestVersion(of: package, upTo: .init(string: upperBoundVersion.description)).description,
+                    from: await appEnv.fetchLatestVersion(of: remoteUrl, upTo: .init(string: upperBoundVersion.description)).description,
                     to: upperBoundVersion.description,
                     option: .upToNextMajor
                 )
             } else {
                 try .range(
-                    from: await appEnv.fetchLatestVersion(of: package).description,
+                    from: await appEnv.fetchLatestVersion(of: remoteUrl).description,
                     to: upperBoundVersion?.description,
                     option: .upToNextMajor
                 )
