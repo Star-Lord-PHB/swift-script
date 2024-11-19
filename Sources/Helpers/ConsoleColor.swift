@@ -25,5 +25,9 @@ extension String {
     var skyBlue: String {
         "\u{001B}[0;36m\(self)\u{001B}[0;0m"
     }
+
+    var lightGray: String {
+        "\u{001B}[0;90m\(self)\u{001B}[0;0m"
+    }
     
 }

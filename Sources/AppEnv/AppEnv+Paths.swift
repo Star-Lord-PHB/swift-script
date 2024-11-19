@@ -34,6 +34,10 @@ extension AppEnv {
 
     var processLockUrl: URL { processLock.path }
 
+    var packageSearchListUrl: URL { 
+        .init(string: "https://raw.githubusercontent.com/SwiftPackageIndex/PackageList/refs/heads/main/packages.json")!
+    }
+
     func makeTempFolder() async throws -> URL {
         let url = tempUrl.appendingCompat(path: UUID().uuidString)
         try await FileManager.default.createDirectory(at: url)
@@ -65,18 +69,6 @@ extension AppEnv {
 
     func makeExecTempUrl() -> URL {
         execUrl.appendingCompat(path: UUID().uuidString)
-    }
-
-    func packageIdentity(of packageUrl: URL) -> String {
-
-        let pathExtension = packageUrl.pathExtension
-
-        return if pathExtension == "git" {
-            packageUrl.deletingPathExtension().lastPathComponent.lowercased()
-        } else {
-            packageUrl.lastPathComponent.lowercased()
-        }
-
     }
 
     func packageCheckoutUrl(of packageIdentity: String) -> URL {

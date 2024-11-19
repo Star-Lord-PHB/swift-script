@@ -54,7 +54,7 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
         
         try await appEnv.withProcessLock {
 
-            let newPackageIdentity = appEnv.packageIdentity(of: package)
+            let newPackageIdentity = packageIdentity(of: package)
             
             printLog("Package identity identified as \(newPackageIdentity)")
         
@@ -98,8 +98,7 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
             print("Fetching products of package \(newPackageIdentity)")
             let newPackageProducts = try await appEnv.fetchPackageProducts(
                 of: package,
-                requirement: requirement,
-                config: config
+                requirement: requirement
             )
             
             printLog("Found products: \(newPackageProducts.libraries.map(\.name).joined(separator: ", "))")

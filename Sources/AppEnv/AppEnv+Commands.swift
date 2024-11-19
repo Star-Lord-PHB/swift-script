@@ -6,13 +6,18 @@ import ArgumentParser
 
 extension AppEnv {
 
-    func resolveRunnerPackage(verbose: Bool = false) async throws {
+    func resolvePackage(at url: URL, verbose: Bool = false) async throws {
         try await Command.requireInPath("swift")
             .addArguments(
                 "package", "resolve",
-                "--package-path", runnerPackageUrl.compactPath(percentEncoded: false)
+                "--package-path", url.compactPath(percentEncoded: false)
             )
             .wait(printingOutput: verbose)
+    }
+
+
+    func resolveRunnerPackage(verbose: Bool = false) async throws {
+        try await resolvePackage(at: runnerPackageUrl, verbose: verbose)
     }
 
 
@@ -38,32 +43,77 @@ extension AppEnv {
     }
 
 
+    func fetchVersionList(of remoteUrl: URL, verbose: Bool = false) async throws -> [Version] {
+        let gitOutput = try await Command.requireInPath("git")
+            .addArguments("ls-remote", "--tags", remoteUrl.absoluteString)
+            .getOutput()
+        if verbose {
+            print(gitOutput.stdout)
+        }
+        return gitOutput.stdout
+            .split(separator: "\n")
+            .compactMap { $0.split(separator: "/").last }
+            .compactMap { Version(string: String($0)) }
+            .sorted()
+    }
+
+
     func fetchLatestVersion(
         of packageUrl: URL,
         upTo upperVersion: Version? = nil,
         verbose: Bool = false
     ) async throws -> Version {
-        let gitOutput = try await Command.requireInPath("git")
-            .addArguments("ls-remote", "--tag", packageUrl.absoluteString)
-            .getOutput()
-        if verbose {
-            print(gitOutput.stdout)
-        }
-        let version = gitOutput.stdout
-            .split(separator: "\n")
-            .compactMap { $0.split(separator: "/").last }
-            .compactMap { Version(string: String($0)) }
-            .filter { upperVersion == nil || $0 < upperVersion! }
-            .max()
-        guard let version else { throw ValidationError("Fail to find any version matched") }
+        guard 
+            let version = try await fetchVersionList(of: packageUrl)
+                .last(where: { upperVersion == nil || $0 < upperVersion! }) 
+        else { throw CLIError(reason: "Fail to find any version matched") }
         return version
+    }
+
+
+    func fetchPackageFullDescription(
+        at remoteUrl: URL, 
+        includeDependencies: Bool = false,
+        verbose: Bool = false
+    ) async throws -> PackageFullDescription {
+
+        let packageIdentity = packageIdentity(of: remoteUrl)
+
+        return try await withTempFolder { tempFolderUrl in
+
+            try await createTempPackage(
+                at: tempFolderUrl,
+                packageUrl: remoteUrl,
+                requirement: .exact(fetchLatestVersion(of: remoteUrl).description),
+                config: loadAppConfig()
+            )
+
+            try await resolvePackage(at: tempFolderUrl, verbose: verbose)
+
+            let packageCheckoutUrl = tempFolderUrl
+                .appendingCompat(path: ".build/checkouts/")
+                .appendingCompat(path: packageIdentity)
+
+            let description = try await loadPackageDescription(
+                of: packageCheckoutUrl, 
+                as: PackageDescription.self
+            )
+
+            if includeDependencies {
+                let dependencyText = try await loadPackageDependenciesText(of: packageCheckoutUrl)
+                return .init(from: description, url: remoteUrl, dependencyText: dependencyText)
+            } else {
+                return .init(from: description, url: remoteUrl, dependencyText: "")
+            }
+
+        }
+
     }
 
 
     func fetchPackageProducts(
         of packageRemoteUrl: URL,
         requirement: InstalledPackage.Requirement,
-        config: AppConfig,
         verbose: Bool = false
     ) async throws -> PackageProducts {
 
@@ -73,27 +123,19 @@ extension AppEnv {
                 at: tempFolderUrl,
                 packageUrl: packageRemoteUrl,
                 requirement: requirement,
-                config: config
+                config: loadAppConfig()
             )
 
-            try await Command.requireInPath("swift")
-                .addArguments(
-                    "package", "resolve",
-                    "--package-path", tempFolderUrl.compactPath(percentEncoded: false)
-                )
-                .wait(printingOutput: verbose)
-
-            let packageCheckoutFolderName = if packageRemoteUrl.pathExtension == "git" {
-                packageRemoteUrl.deletingPathExtension().lastPathComponent
-            } else {
-                packageRemoteUrl.lastPathComponent
-            }
+            try await resolvePackage(at: tempFolderUrl, verbose: verbose)
 
             let packageCheckoutUrl = tempFolderUrl
                 .appendingCompat(path: ".build/checkouts/")
-                .appendingCompat(path: packageCheckoutFolderName)
+                .appendingCompat(path: packageIdentity(of: packageRemoteUrl))
 
-            return try await PackageProducts.load(from: packageCheckoutUrl)
+            return try await loadPackageDescription(
+                of: packageCheckoutUrl, 
+                as: PackageProducts.self
+            )
 
         }
 
@@ -119,23 +161,14 @@ extension AppEnv {
 
     func loadPackageDependenciesText(of packageUrl: URL) async throws -> String {
 
-        let dependenciesOutputFileUrl = packageUrl.appendingCompat(path: "dependencies_text_output.txt")
-        try await grantPermission(forFileAt: dependenciesOutputFileUrl)
-        try await FileManager.default.createFile(
-            at: dependenciesOutputFileUrl,
-            replaceExisting: true
-        )
+        try await resolvePackage(at: packageUrl)
 
-        try await Command.requireInPath("swift")
+        let data = try await Command.requireInPath("swift")
             .setCWD(.init(packageUrl.compactPath(percentEncoded: false)))
             .addArguments("package", "show-dependencies")
-            .setOutputs(.write(toFile: .init(dependenciesOutputFileUrl.compactPath(percentEncoded: false))))
-            .wait()
+            .getOutputWithFile(at: tempUrl.appendingCompat(path: UUID().uuidString))
 
-        return try await String(
-            data: .read(contentsOf: dependenciesOutputFileUrl),
-            encoding: .utf8
-        ) ?? ""
+        return String(data: data, encoding: .utf8) ?? ""
 
     }
 
@@ -145,25 +178,12 @@ extension AppEnv {
         as type: T.Type = T.self
     ) async throws -> T {
 
-        let packageModulesOutputFileUrl = packageUrl.appendingCompat(path: "package_description_output.txt")
-        try await grantPermission(forFileAt: packageModulesOutputFileUrl)
-        try await FileManager.default.createFile(
-            at: packageModulesOutputFileUrl,
-            replaceExisting: true
-        )
-
-        try await Command.requireInPath("swift")
+        let data = try await Command.requireInPath("swift")
             .setCWD(.init(packageUrl.compactPath(percentEncoded: false)))
             .addArguments("package", "describe", "--type", "json")
-            .setOutputs(
-                .write(toFile: .init(packageModulesOutputFileUrl.compactPath(percentEncoded: false)))
-            )
-            .wait()
+            .getOutputWithFile(at: tempUrl.appendingCompat(path: UUID().uuidString))
 
-        return try await JSONDecoder().decode(
-            T.self,
-            from: .read(contentsOf: packageModulesOutputFileUrl)
-        )
+        return try JSONDecoder().decode(T.self, from: data)
 
     }
 
@@ -177,7 +197,7 @@ extension AppEnv {
                 .getOutput().stdout
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             guard let version = Version(string: versionStr) else {
-                throw ValidationError("Fail to parse swift version: \(versionStr)")
+                throw CLIError(reason: "Fail to parse swift version: \(versionStr)")
             }
             return version
         }
@@ -194,14 +214,19 @@ extension AppEnv {
     }
 #endif
 
-    private func grantPermission(forFileAt url: URL) async throws {
-        if await FileManager.default.fileExistsAsync(at: url) {
-            try await FileManager.default.setInfoAsync(
-                .posixPermission,
-                to: 0b110110100,
-                forItemAt: url
-            )
+    func searchPackage(of identity: String) async throws -> URL? {
+        let identity = identity.trimmingCharacters(in: .whitespaces).lowercased()
+        let (data, response) = try await URLSession.shared.data(from: packageSearchListUrl)
+        guard 
+            let response = response as? HTTPURLResponse,
+            response.statusCode >= 200 && response.statusCode < 300
+        else {
+            throw CLIError(reason: "Fail to fetch package list, please report it as an bug")
         }
+        guard let packageList = try? JSONDecoder().decode([URL].self, from: data) else {
+            throw CLIError(reason: "Fail to decode package list, please report it as an bug")
+        }
+        return packageList.first(where: { packageIdentity(of: $0) == identity })
     }
 
 }

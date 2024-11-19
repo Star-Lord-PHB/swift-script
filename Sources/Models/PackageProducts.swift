@@ -34,30 +34,3 @@ extension PackageProducts {
     }
     
 }
-
-
-
-extension PackageProducts {
-    
-    static func load(from packageUrl: URL) async throws -> Self {
-        
-        let outputFileUrl = packageUrl.appendingCompat(path: "otuput.txt")
-        try await FileManager.default.createFile(at: outputFileUrl, replaceExisting: true)
-        
-        try await Command.requireInPath("swift")
-            .addArguments(
-                "package",
-                "--package-path", packageUrl.compactPath(percentEncoded: false),
-                "describe", "--type", "json"
-            )
-            .setOutputs(.write(toFile: .init(outputFileUrl.compactPath())))
-            .wait()
-        
-        return try await JSONDecoder().decode(
-            PackageProducts.self,
-            from: .read(contentsOf: outputFileUrl)
-        )
-        
-    }
-    
-}

@@ -88,5 +88,23 @@ extension Command {
             stderr: output.stderr ?? ""
         )
     }
+
+
+    func getOutputWithFile(
+        at tempFileUrl: URL, 
+        removeTempFile: Bool = true
+    ) async throws -> Data {
+        try await FileManager.default.createFile(at: tempFileUrl, replaceExisting: true)
+        return try await execute {
+            try await self
+                .setOutputs(.write(toFile: .init(tempFileUrl.compactPath(percentEncoded: false))))
+                .wait()
+            return try await .read(contentsOf: tempFileUrl)
+        } finally: {
+            if removeTempFile {
+                try FileManager.default.removeItem(at: tempFileUrl)
+            }
+        }
+    }
     
 }

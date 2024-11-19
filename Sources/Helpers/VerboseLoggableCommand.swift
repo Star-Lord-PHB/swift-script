@@ -104,12 +104,6 @@ extension VerboseLoggableCommand {
     }
     
     
-    func printOverlapping(_ message: String) {
-        print("\u{001B}[2K\r\(message)", terminator: "")
-        fflush(stdout)
-    }
-    
-    
     func registerCleanUp(
         when mode: CleanUpMode = .interrupt,
         operation: @MainActor @escaping () async -> Void

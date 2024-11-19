@@ -164,8 +164,7 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
                 
                 let products = try await appEnv.fetchPackageProducts(
                     of: package.url,
-                    requirement: package.requirement,
-                    config: config
+                    requirement: package.requirement
                 )
                 
                 var package = package

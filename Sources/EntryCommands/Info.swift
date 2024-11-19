@@ -22,6 +22,9 @@ struct SwiftScriptInfo: VerboseLoggableCommand {
         transform: {  $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
     )
     var package: String
+
+    @Flag(name: .long)
+    var showDependencies: Bool = false
     
     @Flag(name: .long)
     var verbose: Bool = false
@@ -39,22 +42,18 @@ struct SwiftScriptInfo: VerboseLoggableCommand {
                 throw CLIError(reason: "Package \(package) is not installed")
             }
             
-            printLog("Loading metadata of package \(package)")
+            printLog("Loading installation info of package \(package)")
             
             guard
-                let packageDescription = try await appEnv.loadInstalledPackages()
+                let packageInstallInfo = try await appEnv.loadInstalledPackages()
                     .first(where: { $0.identity == package })
             else { throw CLIError(reason: "Package \(package) is not installed") }
             
-            printLog("Loading dependencies of package \(package)")
+            printLog("Loading description of package \(package)")
             
-            let dependenciesStr = try await appEnv.loadPackageDependenciesText(of: packageCheckoutPath)
-            
-            printLog("Loading modules of package \(package)")
-            
-            let packageModules = try await appEnv.loadPackageDescription(
+            let packageDescription = try await appEnv.loadPackageDescription(
                 of: packageCheckoutPath,
-                as: PackageModules.self
+                as: PackageDescription.self
             )
             
             printLog("Loading resolved version of package \(package)")
@@ -64,21 +63,48 @@ struct SwiftScriptInfo: VerboseLoggableCommand {
                     .first(where: { $0.identity == package })?
                     .version
             else { throw CLIError(reason: "Package \(package) is not installed") }
-            
-            let infoStr = """
+
+            let platformStr = if packageDescription.platforms.isEmpty {
+                "(Not Specified)"
+            } else {
+                packageDescription.platforms.map(\.description).joined(separator: ", ")
+            }
+
+            if showDependencies {
+
+                printLog("Loading dependencies of package \(package)")
+                let dependenciesStr = try await appEnv.loadPackageDependenciesText(of: packageCheckoutPath)
                 
-                \("Package identity:".green) \(package)
-                \("Package name:".green) \(packageModules.name)
-                \("URL:".green) \(packageDescription.url)
-                \("Specified Requirement:".green) \(packageDescription.requirement)
-                \("Current Version:".green) \(resolvedVersion)
-                \("Modules:".green) \(packageModules.modules.joined(separator: ", "))
-                
-                \("Dependencies:".green)
-                \(dependenciesStr)
-                """
-            
-            print(infoStr)
+                print("""
+                    
+                    \("Package identity:".green) \(package)
+                    \("Package name:".green) \(packageDescription.name)
+                    \("URL:".green) \(packageInstallInfo.url)
+                    \("Specified Requirement:".green) \(packageInstallInfo.requirement)
+                    \("Current Version:".green) \(resolvedVersion)
+                    \("Platforms:".green) \(platformStr)
+                    \("Modules:".green) \(packageDescription.modules.joined(separator: ", "))
+                    
+                    \("Dependencies:".green)
+                    \(dependenciesStr)
+                    """
+                )
+
+            } else {
+
+                print("""
+                    
+                    \("Package identity:".green) \(package)
+                    \("Package name:".green) \(packageDescription.name)
+                    \("URL:".green) \(packageInstallInfo.url)
+                    \("Specified Requirement:".green) \(packageInstallInfo.requirement)
+                    \("Current Version:".green) \(resolvedVersion)
+                    \("Platforms:".green) \(platformStr)
+                    \("Modules:".green) \(packageDescription.modules.joined(separator: ", "))
+                    """
+                )
+
+            }
 
         }
         
