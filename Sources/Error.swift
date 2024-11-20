@@ -66,3 +66,12 @@ extension ExternalCommandError {
     }
 
 }
+
+
+struct ParseError: LocalizedError {
+    let reason: String
+    var errorDescription: String? { reason }
+    init(_ reason: String) {
+        self.reason = reason
+    }
+}

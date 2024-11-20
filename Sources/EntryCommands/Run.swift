@@ -41,7 +41,7 @@ struct SwiftScriptRun: VerboseLoggableCommand {
         
         let scriptBuildUrl = appEnv.scriptBuildUrl(ofType: scriptType)
         let scriptExecUrl = appEnv.makeExecTempUrl()
-        printLog("Allocated executation path: \(scriptExecUrl.compactPath(percentEncoded: false))")
+        printLog("Allocated executation path: \(scriptExecUrl.compatPath(percentEncoded: false))")
         
         registerCleanUp(when: .always) { [verbose] in
             if verbose { printFromStart("Cleaning script executable".skyBlue) }
@@ -63,7 +63,7 @@ struct SwiftScriptRun: VerboseLoggableCommand {
             
         }
         
-        printLog("Executing script at \(scriptExecUrl.compactPath(percentEncoded: false)) with arguments: \(arguments)")
+        printLog("Executing script at \(scriptExecUrl.compatPath(percentEncoded: false)) with arguments: \(arguments)")
         try await appEnv.runExecutable(at: scriptExecUrl, arguments: arguments)
         
     }

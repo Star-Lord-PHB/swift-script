@@ -80,17 +80,13 @@ extension InstalledPackage.Requirement {
         to upperStr: String? = nil,
         option: InstalledPackage.RequirementRangeOption = .upToNextMajor
     ) throws -> Self {
-        guard let lower = Version(string: lowerStr) else {
-            throw ValidationError("invalid sematic version string: \(lowerStr)")
-        }
+        let lower = try SemanticVersion.parse(lowerStr)
         let next = switch option {
-            case .upToNextMajor: Version(major: lower.major + 1, minor: 0, patch: 0)
-            case .uptoNextMinor: Version(major: lower.major, minor: lower.minor + 1, patch: 0)
+            case .upToNextMajor: SemanticVersion(major: lower.major + 1, minor: 0, patch: 0)
+            case .uptoNextMinor: SemanticVersion(major: lower.major, minor: lower.minor + 1, patch: 0)
         }
         if let upperStr {
-            guard let specifiedUpper = Version(string: upperStr) else {
-                throw ValidationError("invalid sematic version string: \(lowerStr)")
-            }
+            let specifiedUpper = try SemanticVersion.parse(upperStr)
             let upper = min(specifiedUpper, next)
             return .range(.init(lowerBound: lower.description, upperBound: upper.description))
         }
@@ -111,58 +107,4 @@ extension InstalledPackage.Requirement: CustomStringConvertible {
                 "\(range.lowerBound) - \(range.upperBound)"
         }
     }
-}
-
-
-struct Version: Codable {
-    let major: Int
-    let minor: Int
-    let patch: Int
-}
-
-
-extension Version {
-    
-    init?(string: String) {
-        let components = string.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ".")
-        let intComponents = components.map { Int($0) } + [Int](repeating: 0, count: max(0, 3 - components.count))
-        guard intComponents.allSatisfy({ $0 != nil }) else { return nil }
-        guard let major = intComponents[0] else { return nil }
-        guard let minor = intComponents[1] else { return nil }
-        guard let patch = intComponents[2] else { return nil }
-        self.major = major
-        self.minor = minor
-        self.patch = patch
-    }
-    
-}
-
-
-extension Version: CustomStringConvertible {
-    var description: String {
-        "\(major).\(minor).\(patch)"
-    }
-}
-
-
-extension Version: Comparable, Hashable {
-    
-    static func < (lhs: Self, rhs: Self) -> Bool {
-        guard lhs.major == rhs.major else { return lhs.major < rhs.major }
-        guard lhs.minor == rhs.minor else { return lhs.minor < rhs.minor }
-        return lhs.patch < rhs.patch
-    }
-    
-}
-
-
-extension Version {
-
-    static func parse(_ string: String) throws -> Self {
-        guard let version = Self(string: string) else {
-            throw ValidationError("invalid sematic version string: \(string)")
-        }
-        return version
-    }
-
 }

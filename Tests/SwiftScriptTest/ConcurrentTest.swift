@@ -195,7 +195,7 @@ extension ConcurrentTest {
         let scriptUrl = Bundle.module.resourceURL!
             .appendingPathComponent("AppFolderTemplates")
             .appendingPathComponent("script")
-        var runCommand = try SwiftScriptRun.parse([scriptUrl.compactPath(percentEncoded: false)])
+        var runCommand = try SwiftScriptRun.parse([scriptUrl.compatPath(percentEncoded: false)])
         runCommand.appEnv = appEnv
         // use `wrappedRun()` instead of `run()` to disable the cleanup operations 
         try await runCommand.wrappedRun()

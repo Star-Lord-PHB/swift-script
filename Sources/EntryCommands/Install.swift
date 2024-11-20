@@ -37,11 +37,11 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
 
     var appEnv: AppEnv = .default
     
-    var exactVersion: Version? { packageVersionSpecifier.exactVersion }
+    var exactVersion: SemanticVersion? { packageVersionSpecifier.exactVersion }
     var branch: String? { packageVersionSpecifier.branch }
-    var upToNextMajorVersion: Version? { packageVersionSpecifier.upToNextMajorVersion }
-    var upToNextMinorVersion: Version? { packageVersionSpecifier.upToNextMinorVersion }
-    var upperBoundVersion: Version? { packageVersionSpecifier.upperBoundVersion }
+    var upToNextMajorVersion: SemanticVersion? { packageVersionSpecifier.upToNextMajorVersion }
+    var upToNextMinorVersion: SemanticVersion? { packageVersionSpecifier.upToNextMinorVersion }
+    var upperBoundVersion: SemanticVersion? { packageVersionSpecifier.upperBoundVersion }
     
     
     func validate() throws {

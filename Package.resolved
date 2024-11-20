@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Star-Lord-PHB/FoundationPlus.git",
       "state" : {
-        "revision" : "141d2ccd077843babc961cf888ba54765dd1a937",
-        "version" : "0.1.0"
+        "revision" : "56145943625db543ad7c9fbfe8262f8fba440bfd",
+        "version" : "0.1.1"
       }
     },
     {
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-async-algorithms",
       "state" : {
-        "revision" : "6ae9a051f76b81cc668305ceed5b0e0a7fd93d20",
-        "version" : "1.0.1"
+        "revision" : "5c8bd186f48c16af0775972700626f0b74588278",
+        "version" : "1.0.2"
       }
     },
     {
@@ -70,7 +70,7 @@
       "location" : "https://github.com/swiftlang/swift-testing.git",
       "state" : {
         "branch" : "main",
-        "revision" : "ba836db1f822393d479ee0dd677949190b554409"
+        "revision" : "1df9545d99b80d8b3ede1c6f3dda1c4087e829af"
       }
     },
     {

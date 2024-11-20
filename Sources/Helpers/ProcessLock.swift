@@ -8,7 +8,7 @@ final class ProcessLock: Sendable {
     let fileLock: NSDistributedLock
 
     init(path: URL = AppEnv.default.processLockUrl) {
-        guard let lock = NSDistributedLock(path: path.compactPath()) else {
+        guard let lock = NSDistributedLock(path: path.compatPath()) else {
             fatalError("Failed to create lock")
         }
         self.path = path
@@ -29,7 +29,7 @@ final class ProcessLock: Sendable {
                     
                     You can keep waiting or stop the current process by pressing Ctrl+C
                     If you are sure that no other process is running, you can manually remove \ 
-                    the lock file at \(path.compactPath(percentEncoded: false))
+                    the lock file at \(path.compatPath(percentEncoded: false))
                     """.yellow
                 )
                 warned = true

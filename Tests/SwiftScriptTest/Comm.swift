@@ -3,12 +3,12 @@ import Foundation
 
 
 enum Requirement {
-    case upToNextMinor(Version, upper: Version?)
-    case upToNextMajor(Version, upper: Version?)
-    case exact(Version)
+    case upToNextMinor(SemanticVersion, upper: SemanticVersion?)
+    case upToNextMajor(SemanticVersion, upper: SemanticVersion?)
+    case exact(SemanticVersion)
     case branch(String)
     case notSpecified
-    case upTo(Version)
+    case upTo(SemanticVersion)
 }
 
 

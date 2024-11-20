@@ -123,7 +123,7 @@ extension Command {
         try await FileManager.default.createFile(at: tempFileUrl, replaceExisting: true)
         return try await execute {
             try await self
-                .setOutputs(.write(toFile: .init(tempFileUrl.compactPath(percentEncoded: false))))
+                .setOutputs(.write(toFile: .init(tempFileUrl.compatPath(percentEncoded: false))))
                 .wait()
             try Task.checkCancellation()
             return try await .read(contentsOf: tempFileUrl)

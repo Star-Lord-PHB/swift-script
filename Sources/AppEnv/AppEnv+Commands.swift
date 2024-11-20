@@ -10,7 +10,7 @@ extension AppEnv {
         try await Command.requireInPath("swift")
             .addArguments(
                 "package", "resolve",
-                "--package-path", url.compactPath(percentEncoded: false)
+                "--package-path", url.compatPath(percentEncoded: false)
             )
             .wait(printingOutput: verbose)
     }
@@ -28,7 +28,7 @@ extension AppEnv {
         try await Command.requireInPath("swift")
             .addArguments(
                 "build",
-                "--package-path", runnerPackageUrl.compactPath(percentEncoded: false),
+                "--package-path", runnerPackageUrl.compatPath(percentEncoded: false),
                 "-c", "release"
             )
             .wait(printingOutput: verbose)
@@ -37,13 +37,13 @@ extension AppEnv {
 
     func createNewPackage(at url: URL) async throws {
         try await Command.requireInPath("swift")
-            .setCWD(.init(url.compactPath(percentEncoded: false)))
+            .setCWD(.init(url.compatPath(percentEncoded: false)))
             .addArguments("package", "init")
             .wait(printingOutput: false)
     }
 
 
-    func fetchVersionList(of remoteUrl: URL, verbose: Bool = false) async throws -> [Version] {
+    func fetchVersionList(of remoteUrl: URL, verbose: Bool = false) async throws -> [SemanticVersion] {
         let gitOutput = try await Command.requireInPath("git")
             .addArguments("ls-remote", "--tags", remoteUrl.absoluteString)
             .getOutput()
@@ -54,16 +54,16 @@ extension AppEnv {
         return gitOutput.stdout
             .split(separator: "\n")
             .compactMap { $0.split(separator: "/").last }
-            .compactMap { Version(string: String($0)) }
+            .compactMap { SemanticVersion(string: String($0)) }
             .sorted()
     }
 
 
     func fetchLatestVersion(
         of packageUrl: URL,
-        upTo upperVersion: Version? = nil,
+        upTo upperVersion: SemanticVersion? = nil,
         verbose: Bool = false
-    ) async throws -> Version {
+    ) async throws -> SemanticVersion {
         guard 
             let version = try await fetchVersionList(of: packageUrl)
                 .last(where: { upperVersion == nil || $0 < upperVersion! }) 
@@ -153,7 +153,7 @@ extension AppEnv {
 
 
     func runExecutable(at executableUrl: URL, arguments: [String]) async throws {
-        try await Command(executablePath: .init(executableUrl.compactPath(percentEncoded: false)))
+        try await Command(executablePath: .init(executableUrl.compatPath(percentEncoded: false)))
             .addArguments(arguments)
             .wait()
     }
@@ -163,7 +163,7 @@ extension AppEnv {
         try await Command.requireInPath("swift")
             .addArguments(
                 "package", "show-dependencies",
-                "--package-path", runnerPackageUrl.compactPath(percentEncoded: false)
+                "--package-path", runnerPackageUrl.compatPath(percentEncoded: false)
             )
             .wait()
     }
@@ -176,7 +176,7 @@ extension AppEnv {
         try Task.checkCancellation()
 
         let data = try await Command.requireInPath("swift")
-            .setCWD(.init(packageUrl.compactPath(percentEncoded: false)))
+            .setCWD(.init(packageUrl.compatPath(percentEncoded: false)))
             .addArguments("package", "show-dependencies")
             .getOutputWithFile(at: tempUrl.appendingCompat(path: UUID().uuidString))
 
@@ -191,7 +191,7 @@ extension AppEnv {
     ) async throws -> T {
 
         let data = try await Command.requireInPath("swift")
-            .setCWD(.init(packageUrl.compactPath(percentEncoded: false)))
+            .setCWD(.init(packageUrl.compatPath(percentEncoded: false)))
             .addArguments("package", "describe", "--type", "json")
             .getOutputWithFile(at: tempUrl.appendingCompat(path: UUID().uuidString))
 
@@ -205,7 +205,7 @@ extension AppEnv {
             try await createNewPackage(at: folderUrl)
             try Task.checkCancellation()
             let versionStr = try await Command.requireInPath("swift")
-                .setCWD(.init(folderUrl.compactPath(percentEncoded: false)))
+                .setCWD(.init(folderUrl.compatPath(percentEncoded: false)))
                 .addArguments("package", "tools-version")
                 .getOutput().stdout
                 .trimmingCharacters(in: .whitespacesAndNewlines)

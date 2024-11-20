@@ -9,16 +9,16 @@ import ArgumentParser
 
 
 struct PackageVersionSpecifierArguments: ParsableArguments {
-    @Option(name: .customLong("exact"), transform: Version.parse(_:))
-    var exactVersion: Version?
+    @Option(name: .customLong("exact"), transform: SemanticVersion.parse(_:))
+    var exactVersion: SemanticVersion?
     @Option
     var branch: String?
-    @Option(name: .customLong("from"), transform: Version.parse(_:))
-    var upToNextMajorVersion: Version?
-    @Option(name: .customLong("up-to-next-minor-from"), transform: Version.parse(_:))
-    var upToNextMinorVersion: Version?
-    @Option(name: .customLong("to"), transform: Version.parse(_:))
-    var upperBoundVersion: Version?
+    @Option(name: .customLong("from"), transform: SemanticVersion.parse(_:))
+    var upToNextMajorVersion: SemanticVersion?
+    @Option(name: .customLong("up-to-next-minor-from"), transform: SemanticVersion.parse(_:))
+    var upToNextMinorVersion: SemanticVersion?
+    @Option(name: .customLong("to"), transform: SemanticVersion.parse(_:))
+    var upperBoundVersion: SemanticVersion?
 }
 
 

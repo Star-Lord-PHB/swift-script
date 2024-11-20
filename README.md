@@ -8,7 +8,7 @@ The project is still under construction and only support very basic features.
 
 Currently known limitations: 
 - [ ] [Swift Package Index](https://swiftpackageindex.com) still does not have APIs available, currently using their [package list repository](https://github.com/SwiftPackageIndex/PackageList/blob/main/packages.json) 
-- [ ] Does not support complex semetic version format other than the basic `major.minor.patch` format yet. In other word, formats such as `v1.0.0`, `1.0.0-alpha` are not currently supported
+- [x] ~~Does not support complex semetic version format other than the basic `major.minor.patch` format yet. In other word, formats such as `v1.0.0`, `1.0.0-alpha` are not currently supported~~
 - [ ] No formal installation script yet
 - [ ] Not tested on Linux or Windows yet
 - [ ] Does not support customized swift location yet

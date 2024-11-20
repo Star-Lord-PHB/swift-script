@@ -55,7 +55,7 @@ extension SwiftScriptTestBase {
         }
 
         guard let cmd = Command.findInPath(withName: "swift")?
-            .setCWD(.init(appEnv.runnerPackageUrl.compactPath(percentEncoded: false)))
+            .setCWD(.init(appEnv.runnerPackageUrl.compatPath(percentEncoded: false)))
             .addArguments("package", "resolve")
         else {
             throw ExternalCommandError.commandNotFound("swift")
@@ -107,7 +107,7 @@ extension SwiftScriptTestBase {
         )
 
         guard let cmd = Command.findInPath(withName: "swift")?
-            .setCWD(.init(appEnv.runnerPackageUrl.compactPath(percentEncoded: false)))
+            .setCWD(.init(appEnv.runnerPackageUrl.compatPath(percentEncoded: false)))
             .addArguments("package", "show-dependencies", "--format", "json")
         else {
             throw ExternalCommandError.commandNotFound("swift")
@@ -150,39 +150,39 @@ extension SwiftScriptTestBase {
         switch (installedRequirement, expectedRequirement) {
 
             case (.range(let range), .upToNextMajor(let lower, let .some(upper))):
-                #expect(Version(string: range.lowerBound) == lower)
-                #expect(Version(string: range.upperBound) == min(upper, .init(major: lower.major + 1, minor: 0, patch: 0)))
+                #expect(SemanticVersion(string: range.lowerBound) == lower)
+                #expect(SemanticVersion(string: range.upperBound) == min(upper, .init(major: lower.major + 1, minor: 0, patch: 0)))
 
             case (.range(let range), .upToNextMajor(let lower, _)):
-                #expect(Version(string: range.lowerBound) == lower)
-                #expect(Version(string: range.upperBound) == .init(major: lower.major + 1, minor: 0, patch: 0))
+                #expect(SemanticVersion(string: range.lowerBound) == lower)
+                #expect(SemanticVersion(string: range.upperBound) == .init(major: lower.major + 1, minor: 0, patch: 0))
 
             case (.range(let installedVersion), .upToNextMinor(let lower, let .some(upper))):
-                #expect(Version(string: installedVersion.lowerBound) == lower)
+                #expect(SemanticVersion(string: installedVersion.lowerBound) == lower)
                 #expect(
-                    Version(string: installedVersion.upperBound)! 
+                    SemanticVersion(string: installedVersion.upperBound)! 
                     == min(upper, .init(major: lower.major, minor: lower.minor + 1, patch: 0))
                 )
 
             case (.range(let installedVersion), .upToNextMinor(let lower, _)):
-                #expect(Version(string: installedVersion.lowerBound) == lower)
+                #expect(SemanticVersion(string: installedVersion.lowerBound) == lower)
                 #expect(
-                    Version(string: installedVersion.upperBound)! 
+                    SemanticVersion(string: installedVersion.upperBound)! 
                     == .init(major: lower.major, minor: lower.minor + 1, patch: 0)
                 )
 
             case (.range(let installedVersion), .upTo(let upper)):
-                #expect(Version(string: installedVersion.upperBound) == upper)
+                #expect(SemanticVersion(string: installedVersion.upperBound) == upper)
 
             case (.range(let installedVersion), .notSpecified):
-                let upperVersion = Version(string: installedVersion.upperBound)
+                let upperVersion = SemanticVersion(string: installedVersion.upperBound)
                 #expect(
                     upperVersion?.minor == 0 && upperVersion?.patch == 0, 
                     "When no specific requirement, the upper bound must be a major version"
                 )
 
             case (.exact(let installedVersion), .exact(let expectedVersion)):
-                #expect(Version(string: installedVersion) == expectedVersion)
+                #expect(SemanticVersion(string: installedVersion) == expectedVersion)
 
             case (.branch(let installedBranch), .branch(let expectedBranch)):
                 #expect(installedBranch == expectedBranch)
