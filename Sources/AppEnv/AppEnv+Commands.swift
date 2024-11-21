@@ -1,20 +1,10 @@
-import Foundation
+import FoundationPlusEssential
 import SwiftCommand
 import FileManagerPlus
 import ArgumentParser
 
 
 extension AppEnv {
-
-    func resolvePackage(at url: URL, verbose: Bool = false) async throws {
-        try await Command.requireInPath("swift")
-            .addArguments(
-                "package", "resolve",
-                "--package-path", url.compatPath(percentEncoded: false)
-            )
-            .wait(printingOutput: verbose)
-    }
-
 
     func resolveRunnerPackage(verbose: Bool = false) async throws {
         try await resolvePackage(at: runnerPackageUrl, verbose: verbose)
@@ -35,15 +25,10 @@ extension AppEnv {
     }
 
 
-    func createNewPackage(at url: URL) async throws {
-        try await Command.requireInPath("swift")
-            .setCWD(.init(url.compatPath(percentEncoded: false)))
-            .addArguments("package", "init")
-            .wait(printingOutput: false)
-    }
-
-
-    func fetchVersionList(of remoteUrl: URL, verbose: Bool = false) async throws -> [SemanticVersion] {
+    func fetchVersionList(
+        of remoteUrl: URL, 
+        verbose: Bool = false
+    ) async throws -> [(version: SemanticVersion, str: String)] {
         let gitOutput = try await Command.requireInPath("git")
             .addArguments("ls-remote", "--tags", remoteUrl.absoluteString)
             .getOutput()
@@ -54,8 +39,14 @@ extension AppEnv {
         return gitOutput.stdout
             .split(separator: "\n")
             .compactMap { $0.split(separator: "/").last }
-            .compactMap { SemanticVersion(string: String($0)) }
-            .sorted()
+            .compactMap { 
+                let str = String($0)
+                guard let version = SemanticVersion(string: str) else {
+                    return nil 
+                }
+                return (version: version, str: str)
+            }
+            .sorted(by: \.version)
     }
 
 
@@ -66,9 +57,24 @@ extension AppEnv {
     ) async throws -> SemanticVersion {
         guard 
             let version = try await fetchVersionList(of: packageUrl)
-                .last(where: { upperVersion == nil || $0 < upperVersion! }) 
+                .last(where: { upperVersion == nil || $0.version < upperVersion! })?
+                .version
         else { throw CLIError(reason: "Fail to find any version matched") }
         return version
+    }
+
+
+    func fetchLatestVersionStr(
+        of packageUrl: URL,
+        upTo upperVersion: SemanticVersion? = nil,
+        verbose: Bool = false
+    ) async throws -> String {
+        guard 
+            let str = try await fetchVersionList(of: packageUrl)
+                .last(where: { upperVersion == nil || $0.version < upperVersion! })?
+                .str
+        else { throw CLIError(reason: "Fail to find any version matched") }
+        return str
     }
 
 
@@ -78,35 +84,22 @@ extension AppEnv {
         verbose: Bool = false
     ) async throws -> PackageFullDescription {
 
-        let packageIdentity = packageIdentity(of: remoteUrl)
-
         return try await withTempFolder { tempFolderUrl in
 
-            try await createTempPackage(
-                at: tempFolderUrl,
-                packageUrl: remoteUrl,
-                requirement: .exact(fetchLatestVersion(of: remoteUrl).description),
-                config: loadAppConfig()
-            )
+            let latestVersionStr = try await fetchLatestVersionStr(of: remoteUrl, verbose: verbose)
+            try Task.checkCancellation()
+            try await clonePackage(remoteUrl, to: tempFolderUrl, branch: latestVersionStr, verbose: verbose)
 
             try Task.checkCancellation()
-
-            try await resolvePackage(at: tempFolderUrl, verbose: verbose)
-
-            try Task.checkCancellation()
-
-            let packageCheckoutUrl = tempFolderUrl
-                .appendingCompat(path: ".build/checkouts/")
-                .appendingCompat(path: packageIdentity)
 
             let description = try await loadPackageDescription(
-                of: packageCheckoutUrl, 
+                of: tempFolderUrl, 
                 as: PackageDescription.self
             )
 
             if includeDependencies {
                 try Task.checkCancellation()
-                let dependencyText = try await loadPackageDependenciesText(of: packageCheckoutUrl)
+                let dependencyText = try await loadPackageDependenciesText(of: tempFolderUrl)
                 return .init(from: description, url: remoteUrl, dependencyText: dependencyText)
             } else {
                 return .init(from: description, url: remoteUrl, dependencyText: "")
@@ -125,25 +118,29 @@ extension AppEnv {
 
         try await withTempFolder { tempFolderUrl in
 
-            try await createTempPackage(
-                at: tempFolderUrl,
-                packageUrl: packageRemoteUrl,
-                requirement: requirement,
-                config: loadAppConfig()
+            let branch = switch requirement {
+                case .branch(let branch): branch 
+                case .exact(let version): version
+                case .range(let range): try await fetchLatestVersionStr(
+                    of: packageRemoteUrl, 
+                    upTo: .parse(range.upperBound), 
+                    verbose: verbose
+                )
+            }
+
+            try Task.checkCancellation()
+
+            try await clonePackage(
+                packageRemoteUrl, 
+                to: tempFolderUrl, 
+                branch: branch, 
+                verbose: verbose
             )
 
             try Task.checkCancellation()
 
-            try await resolvePackage(at: tempFolderUrl, verbose: verbose)
-
-            let packageCheckoutUrl = tempFolderUrl
-                .appendingCompat(path: ".build/checkouts/")
-                .appendingCompat(path: packageIdentity(of: packageRemoteUrl))
-
-            try Task.checkCancellation()
-
             return try await loadPackageDescription(
-                of: packageCheckoutUrl, 
+                of: tempFolderUrl, 
                 as: PackageProducts.self
             )
 
@@ -240,6 +237,49 @@ extension AppEnv {
             throw CLIError(reason: "Fail to decode package list, please report it as an bug")
         }
         return packageList.first(where: { packageIdentity(of: $0) == identity })
+    }
+
+}
+
+
+extension AppEnv {
+
+    func clonePackage(
+        _ remoteUrl: URL, 
+        to localUrl: URL, 
+        branch: String? = nil,
+        verbose: Bool = false
+    ) async throws {
+
+        let arguments = if let branch {
+            ["clone", "--branch", branch, remoteUrl.absoluteString, "."]
+        } else {
+            ["clone", remoteUrl.absoluteString]
+        }
+
+        try await Command.requireInPath("git")
+            .setCWD(.init(localUrl.compatPath(percentEncoded: false)))
+            .addArguments(arguments)
+            .wait(printingOutput: verbose)
+
+    }
+
+
+    func createNewPackage(at url: URL) async throws {
+        try await Command.requireInPath("swift")
+            .setCWD(.init(url.compatPath(percentEncoded: false)))
+            .addArguments("package", "init")
+            .wait(printingOutput: false)
+    }
+
+
+    func resolvePackage(at url: URL, verbose: Bool = false) async throws {
+        try await Command.requireInPath("swift")
+            .addArguments(
+                "package", "resolve",
+                "--package-path", url.compatPath(percentEncoded: false)
+            )
+            .wait(printingOutput: verbose)
     }
 
 }

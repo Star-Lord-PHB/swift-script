@@ -110,21 +110,21 @@ extension AppEnv {
         return try await .read(contentsOf: runnerPackageManifestUrl)
     }
 
-    func createTempPackage(
-        at url: URL,
-        packageUrl: URL,
-        requirement: InstalledPackage.Requirement,
-        config: AppConfig
-    ) async throws {
-        try await createNewPackage(at: url)
-        let manifest = PackageManifestTemplate.makeTempPackageManifest(
-            packageUrl: packageUrl,
-            requirement: requirement,
-            config: config
-        )
-        try Task.checkCancellation()
-        try await Data(manifest.utf8).write(to: url.appendingCompat(path: "Package.swift"))
-    }
+    // func createTempPackage(
+    //     at url: URL,
+    //     packageUrl: URL,
+    //     requirement: InstalledPackage.Requirement,
+    //     config: AppConfig
+    // ) async throws {
+    //     try await createNewPackage(at: url)
+    //     let manifest = PackageManifestTemplate.makeTempPackageManifest(
+    //         packageUrl: packageUrl,
+    //         requirement: requirement,
+    //         config: config
+    //     )
+    //     try Task.checkCancellation()
+    //     try await Data(manifest.utf8).write(to: url.appendingCompat(path: "Package.swift"))
+    // }
 
 
     func cleanOldScripts() async throws {
