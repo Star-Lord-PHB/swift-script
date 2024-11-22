@@ -9,6 +9,7 @@ struct VersionTest {
         "Valid Version Parsing",
         arguments: [
             ("1.0.0", .init(major: 1, minor: 0, patch: 0)),
+            ("1.101.202", .init(major: 1, minor: 101, patch: 202)),
             ("v1.2.3", .init(major: 1, minor: 2, patch: 3)),
             ("1.2.3-alpha", .init(major: 1, minor: 2, patch: 3, prerelease: ["alpha"])),
             ("1.2.3+beta", .init(major: 1, minor: 2, patch: 3, build: ["beta"])),

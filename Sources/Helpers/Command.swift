@@ -74,31 +74,7 @@ extension Command where Stdout == UnspecifiedOutputDestination {
 
 extension Command {
 
-    func getOutput() async throws -> ProcessOutput where Stdout == PipeOutputDestination {
-
-        let process = try SendableWrapper(value: self.spawn())
-
-        let output = try await withTaskCancellationHandler {
-            try await process.value.output
-        } onCancel: {
-            process.value.interrupt()
-        }
-
-        try Task.checkCancellation()
-
-        guard !output.status.terminatedSuccessfully else { return output }
-
-        throw ExternalCommandError(
-            command: self.executablePath.string,
-            args: self.arguments,
-            code: output.status.exitCode ?? ExitCode.failure.rawValue,
-            stderr: output.stderr ?? ""
-        )
-        
-    }
-
-
-    func getOutput() async throws -> ProcessOutput where Stdout == UnspecifiedOutputDestination {
+    func getOutput() async throws -> ProcessOutput {
         let process = try SendableWrapper(value: self.setOutputs(.pipe).spawn())
         let output = try await withTaskCancellationHandler {
             try await process.value.output
@@ -116,21 +92,17 @@ extension Command {
     }
 
 
-    func getOutputWithFile(
-        at tempFileUrl: URL, 
-        removeTempFile: Bool = true
-    ) async throws -> Data {
+    func getOutputWithFile(at tempFileUrl: URL) async throws -> Data {
         try await FileManager.default.createFile(at: tempFileUrl, replaceExisting: true)
         return try await execute {
             try await self
-                .setOutputs(.write(toFile: .init(tempFileUrl.compatPath(percentEncoded: false))))
+                .setStdout(.write(toFile: .init(tempFileUrl.compatPath(percentEncoded: false))))
+                .setStderr(.pipe)
                 .wait()
             try Task.checkCancellation()
             return try await .read(contentsOf: tempFileUrl)
         } finally: {
-            if removeTempFile {
-                try FileManager.default.removeItem(at: tempFileUrl)
-            }
+            try FileManager.default.removeItem(at: tempFileUrl)
         }
     }
     

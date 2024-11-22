@@ -29,22 +29,11 @@ extension AppEnv {
         of remoteUrl: URL, 
         verbose: Bool = false
     ) async throws -> [(version: SemanticVersion, str: String)] {
-        let gitOutput = try await Command.requireInPath("git")
-            .addArguments("ls-remote", "--tags", remoteUrl.absoluteString)
-            .getOutput()
-        if verbose {
-            printFromStart(gitOutput.stdout)
-        }
+        let rawGitTags = try await fetchRemoteTags(at: remoteUrl, verbose: verbose)
         try Task.checkCancellation()
-        return gitOutput.stdout
-            .split(separator: "\n")
-            .compactMap { $0.split(separator: "/").last }
-            .compactMap { 
-                let str = String($0)
-                guard let version = SemanticVersion(string: str) else {
-                    return nil 
-                }
-                return (version: version, str: str)
+        return rawGitTags
+            .compactMap { tag in
+                SemanticVersion(string: tag).map { ($0, tag) }
             }
             .sorted(by: \.version)
     }
@@ -80,15 +69,14 @@ extension AppEnv {
 
     func fetchPackageFullDescription(
         at remoteUrl: URL, 
+        tag: String,
         includeDependencies: Bool = false,
         verbose: Bool = false
     ) async throws -> PackageFullDescription {
 
         return try await withTempFolder { tempFolderUrl in
 
-            let latestVersionStr = try await fetchLatestVersionStr(of: remoteUrl, verbose: verbose)
-            try Task.checkCancellation()
-            try await clonePackage(remoteUrl, to: tempFolderUrl, branch: latestVersionStr, verbose: verbose)
+            try await clonePackage(remoteUrl, to: tempFolderUrl, tag: tag, verbose: verbose)
 
             try Task.checkCancellation()
 
@@ -133,7 +121,7 @@ extension AppEnv {
             try await clonePackage(
                 packageRemoteUrl, 
                 to: tempFolderUrl, 
-                branch: branch, 
+                tag: branch, 
                 verbose: verbose
             )
 
@@ -247,12 +235,12 @@ extension AppEnv {
     func clonePackage(
         _ remoteUrl: URL, 
         to localUrl: URL, 
-        branch: String? = nil,
+        tag: String? = nil,
         verbose: Bool = false
     ) async throws {
 
-        let arguments = if let branch {
-            ["clone", "--branch", branch, remoteUrl.absoluteString, "."]
+        let arguments = if let tag {
+            ["clone", "--branch", tag, remoteUrl.absoluteString, "."]
         } else {
             ["clone", remoteUrl.absoluteString]
         }
@@ -280,6 +268,26 @@ extension AppEnv {
                 "--package-path", url.compatPath(percentEncoded: false)
             )
             .wait(printingOutput: verbose)
+    }
+
+
+    func fetchRemoteTags(at url: URL, verbose: Bool = false) async throws -> [String] {
+
+        let data = try await Command.requireInPath("git")
+            .addArguments(
+                "ls-remote", "--tags", url.absoluteString
+            )
+            .getOutputWithFile(at: tempUrl.appendingCompat(path: UUID().uuidString))
+
+        let output = String(data: data, encoding: .utf8) ?? ""
+        if verbose {
+            printFromStart(output)
+        }
+        return output
+            .split(separator: "\n")
+            .compactMap { $0.split(separator: "/").last }
+            .map { String($0) }
+
     }
 
 }
