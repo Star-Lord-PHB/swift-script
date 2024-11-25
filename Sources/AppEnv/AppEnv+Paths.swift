@@ -32,7 +32,9 @@ extension AppEnv {
         runnerPackageUrl.appendingCompat(path: ".build/release/Runner")
     }
 
-    var processLockUrl: URL { processLock.path }
+    var processLockUrl: URL {
+        appBaseUrl.appendingCompat(path: "lock.lock")
+    }
 
     var packageSearchListUrl: URL { 
         .init(string: "https://raw.githubusercontent.com/SwiftPackageIndex/PackageList/refs/heads/main/packages.json")!

@@ -4,21 +4,32 @@ import ConcurrencyPlus
 
 final class ProcessLock: Sendable {
 
-    let path: URL 
-    let fileLock: NSDistributedLock
+    let path: String
 
-    init(path: URL = AppEnv.default.processLockUrl) {
-        guard let lock = NSDistributedLock(path: path.compatPath()) else {
-            fatalError("Failed to create lock")
-        }
+    init(path: String) {
         self.path = path
-        self.fileLock = lock
     }
 
-    func lock() async throws {
-        let startTime = Date()
+    convenience init(path: URL = AppEnv.default.processLockUrl) {
+        self.init(path: path.compatPath(percentEncoded: false))
+    }
+
+
+    func withLock<T>(_ operation: () async throws -> T) async throws -> T {
+        
+        let fd = try await launchTask(on: .io) {
+            let fd = open(self.path, O_CREAT | O_RDWR, 0o666)
+            guard fd >= 0 else {
+                throw Error(code: errno, message: "Failed to open lock file")
+            }
+            return fd
+        }
+
         var warned = false
-        while await !fileLock.try() {
+        let startTime = Date()
+
+        while true {
+
             if !warned && Date().timeIntervalSince(startTime) > 30 {
                 printFromStart("""
                     Warning: waiting for lock for more than 30 seconds
@@ -29,46 +40,52 @@ final class ProcessLock: Sendable {
                     
                     You can keep waiting or stop the current process by pressing Ctrl+C
                     If you are sure that no other process is running, you can manually remove \ 
-                    the lock file at \(path.compatPath(percentEncoded: false))
+                    the lock file at \(self.path)
                     """.yellow
                 )
                 warned = true
             }
+
+            let (result, localErrno) = await launchTask(on: .io) { 
+                let result = flock(fd, LOCK_EX | LOCK_NB) 
+                return (result, errno)
+            }
+
+            if result == 0 { break }
+
+            guard localErrno == EWOULDBLOCK else {
+                close(fd)
+                throw Error(code: errno, message: "Failed to acquire lock")
+            }
+
             if #available(macOS 13, *) {
                 try await Task.sleep(for: .milliseconds(100))
             } else {
                 try await Task.sleep(nanoseconds: 100 * 1_000_000)
             }
-        }
-    }
 
-    func unlock() async {
-        await fileLock.unlock()
-    }
-
-    func withLock<T>(_ body: () async throws -> T) async throws -> T {
-        try await lock()
-        do {
-            let result = try await body()
-            await unlock()
-            return result
-        } catch {
-            await unlock()
-            throw error
         }
+
+        return try await execute {
+            try await operation()
+        } finally: {
+            await launchTask(on: .io) { 
+                flock(fd, LOCK_UN)
+                close(fd) 
+            }
+        }
+
     }
 
 }
 
 
-extension NSDistributedLock {
+extension ProcessLock {
 
-    func `try`() async -> Bool {
-        await launchTask(on: .io) { self.try() }
-    }
-
-    func unlock() async {
-        await launchTask(on: .io) { self.unlock() }
+    struct Error: LocalizedError {
+        let code: Int32
+        let message: String
+        var errorDescription: String? { "File Lock Error (\(code)) - \(message)" }
     }
 
 }
