@@ -191,7 +191,7 @@ extension ConcurrentTest {
 
 
     fileprivate func runScript() async throws {
-        print(try await FileManager.default.directoryEntries(at: Bundle.module.resourceURL!))
+        print(try await FileManager.default.contentsOfDirectory(at: Bundle.module.resourceURL!))
         let scriptUrl = Bundle.module.resourceURL!
             .appendingPathComponent("AppFolderTemplates")
             .appendingPathComponent("script")

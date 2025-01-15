@@ -26,7 +26,7 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
     @Flag(name: .shortAndLong)
     var verbose: Bool = false
     
-    @Flag(help: "If set, then when the specified package is already installed, it will be replaced without prompt")
+    @Flag(name: .shortAndLong, help: "If set, then when the specified package is already installed, it will be replaced without prompt")
     var forceReplace: Bool = false
     
     @Option(name: .customLong("Xbuild"), parsing: .singleValue, help: #"Pass flag through to "swift build" command"#)
@@ -36,6 +36,7 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
     var noBuild: Bool = false
 
     var appEnv: AppEnv = .default
+    var logger: Logger = .init()
     
     var exactVersion: SemanticVersion? { packageVersionSpecifier.exactVersion }
     var branch: String? { packageVersionSpecifier.branch }
@@ -58,77 +59,75 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
         let (newPackageIdentity, packageRemoteUrl) = try await resolveIdentityAndUrl()
         
         try await appEnv.withProcessLock {
+
+            logger.printDebug("Loading installed packages and package manifest")
+            let original = try await appEnv.cacheOriginals(\.installedPackages, \.packageManifest)
         
-            printLog("Loading installed packages")
-            var installedPackages = try await appEnv.loadInstalledPackages()
-            printLog("Loading configuration")
+            var installedPackages = original.installedPackages!
+
+            logger.printDebug("Loading configuration")
             let config = try await appEnv.loadAppConfig()
             
-            let originalPackages = installedPackages
-            printLog("Caching current runner package manifest")
-            let originalPackageManifest = try await appEnv.loadPackageManifes()
-            
-            printLog("Checking whether package is already installed")
-            conflictHandle: if let conflictPackageIndex = installedPackages
+            logger.printDebug("Checking whether package is already installed")
+            if let conflictPackageIndex = installedPackages
                 .firstIndex(where: { $0.identity == newPackageIdentity }) {
-                
-                defer {
-                    printFromStart("Removing package \(newPackageIdentity)")
-                    installedPackages.remove(at: conflictPackageIndex)
+
+                if !forceReplace {
+
+                    let conflictPackage = installedPackages[conflictPackageIndex]
+                    print("Package \(conflictPackage.identity) is already installed (\(conflictPackage.requirement))")
+                    print("Would you like to overwrite it? [y/n] (default: n):", terminator: " ")
+                    
+                    let input = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                    guard input == "y" || input == "yes" else {
+                        print("Aborted")
+                        throw ExitCode.success
+                    }
+
                 }
-                
-                guard !forceReplace else { break conflictHandle }
-                
-                let conflictPackage = installedPackages[conflictPackageIndex]
-                print("Package \(conflictPackage.identity) is already installed (\(conflictPackage.requirement))")
-                print("Would you like to overwrite it? [y/n] (default: n):", terminator: " ")
-                
-                let input = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-                guard input == "y" || input == "yes" else {
-                    printFromStart("Aborted")
-                    throw ExitCode.success
-                }
+
+                print("Removing package \(newPackageIdentity)")
+                installedPackages.remove(at: conflictPackageIndex)
                 
             }
             
-            printLog("Calculating version requirement")
+            logger.printDebug("Calculating version requirement")
             let requirement = try await extractRequirement(packageRemoteUrl)
             
-            printFromStart("Version requirement extracted as: \(requirement)")
+            print("Version requirement extracted as: \(requirement)")
             
-            printFromStart("Fetching products of package \(newPackageIdentity)")
+            logger.printDebug("Fetching products of package \(newPackageIdentity)")
             let newPackageProducts = try await appEnv.fetchPackageProducts(
                 of: packageRemoteUrl,
                 requirement: requirement
             )
             
-            printLog("Found products: \(newPackageProducts.libraries.map(\.name).joined(separator: ", "))")
+            print("Found products: \(newPackageProducts.libraries.map(\.name).joined(separator: ", "))")
             
             installedPackages.append(
                 .init(
                     identity: newPackageIdentity,
                     url: packageRemoteUrl,
-                    libraries: newPackageProducts.libraries.map(to: \.name),
+                    libraries: newPackageProducts.libraries.map(\.name),
                     requirement: requirement
                 )
             )
             
             registerCleanUp { 
-                printFromStart("Restoring original package manifest and installed packages")
-                try? await originalPackageManifest.write(to: appEnv.runnerPackageManifestUrl)
-                try? await appEnv.saveInstalledPackages(originalPackages)
+                logger.printDebug("Restoring original package manifest and installed packages")
+                try? await appEnv.restoreOriginals(original)
             }
             
-            printFromStart("Saving updated installed packages")
+            print("Saving updated installed packages")
             try await appEnv.saveInstalledPackages(installedPackages)
-            printFromStart("Saving updating runner package manifest")
+            print("Saving updating runner package manifest")
             try await appEnv.updatePackageManifest(installedPackages: installedPackages, config: config)
             
             if noBuild {
-                printFromStart("Resolving (will not build since `--no-build` is set)")
+                print("Resolving (will not build since `--no-build` is set)")
                 try await appEnv.resolveRunnerPackage(verbose: verbose)
             } else {
-                printFromStart("Building")
+                print("Building ...")
                 try await appEnv.buildRunnerPackage(arguments: buildArguments, verbose: true)
             }
             
@@ -143,20 +142,20 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
         let newPackageIdentity: String
         
         if let url = URL(string: package), url.scheme != nil {
-            printLog("Input identified as package URL")
+            logger.printDebug("Input identified as package URL")
             packageRemoteUrl = url
             newPackageIdentity = packageIdentity(of: packageRemoteUrl)
-            printLog("Package identity identified as \(newPackageIdentity)")
+            logger.printDebug("Package identity identified as \(newPackageIdentity)")
         } else {
-            printLog("Input identified as package identity")
-            printLog("Searching package \(package) in swift package index")
+            logger.printDebug("Input identified as package identity")
+            logger.printDebug("Searching package \(package) in swift package index")
             newPackageIdentity = package
             if let url = try await appEnv.searchPackage(of: package) {
                 packageRemoteUrl = url
             } else {
                 throw CLIError(reason: "Package \(package) is not found in swift package index")
             }
-            printFromStart("Found package \(package) with remote url: \(packageRemoteUrl)")
+            print("Found package \(package) with remote url: \(packageRemoteUrl)")
         }
 
         return (newPackageIdentity, packageRemoteUrl)

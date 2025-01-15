@@ -16,7 +16,7 @@ extension AppEnv {
 
         let structure = try await JSONDecoder().decode(
             AppConfigCodingStructure.self,
-            from: .read(contentsOf: configFileUrl)
+            from: .read(contentAt: configFilePath)
         )
 #if os(macOS)
         try Task.checkCancellation()
@@ -54,7 +54,7 @@ extension AppEnv {
             swiftVersion: config.swiftVersion.description,
             macosVersion: config.macosVersion.description
         )
-        try await JSONEncoder().encode(structure).write(to: configFileUrl)
+        try await JSONEncoder().encode(structure).write(to: configFilePath)
 
     }
 
@@ -62,13 +62,13 @@ extension AppEnv {
         try Task.checkCancellation()
         return try await JSONDecoder().decode(
             [InstalledPackage].self,
-            from: .read(contentsOf: installedPackagesUrl)
+            from: .read(contentAt: installedPackagesPath)
         )
     }
 
     func saveInstalledPackages(_ packages: [InstalledPackage]) async throws {
         try Task.checkCancellation()
-        return try await JSONEncoder().encode(packages).write(to: installedPackagesUrl)
+        return try await JSONEncoder().encode(packages).write(to: installedPackagesPath)
     }
 
     func loadResolvedDependencyVersionList() async throws -> [ResolvedDependencyVersion] {
@@ -80,7 +80,7 @@ extension AppEnv {
 
         return try await JSONDecoder().decode(
             ResolvedDependencyVersionList.self,
-            from: .read(contentsOf: runnerResolvedPackagesUrl)
+            from: .read(contentAt: runnerResolvedPackagesPath)
         )
         .dependencies
         .filter { actualInstalledPackageIdentities.contains($0.identity) }
@@ -102,38 +102,91 @@ extension AppEnv {
             installedPackages: installedPackages,
             config: config
         )
-        try await Data(manifest.utf8).write(to: runnerPackageManifestUrl)
+        try await Data(manifest.utf8).write(to: runnerPackageManifestPath)
     }
 
     func loadPackageManifes() async throws -> Data {
         try Task.checkCancellation()
-        return try await .read(contentsOf: runnerPackageManifestUrl)
+        return try await .read(contentAt: runnerPackageManifestPath)
     }
-
-    // func createTempPackage(
-    //     at url: URL,
-    //     packageUrl: URL,
-    //     requirement: InstalledPackage.Requirement,
-    //     config: AppConfig
-    // ) async throws {
-    //     try await createNewPackage(at: url)
-    //     let manifest = PackageManifestTemplate.makeTempPackageManifest(
-    //         packageUrl: packageUrl,
-    //         requirement: requirement,
-    //         config: config
-    //     )
-    //     try Task.checkCancellation()
-    //     try await Data(manifest.utf8).write(to: url.appendingCompat(path: "Package.swift"))
-    // }
 
 
     func cleanOldScripts() async throws {
         try Task.checkCancellation()
-        let files = try await FileManager.default.directoryEntries(at: runnerPackageUrl.appendingCompat(path: "Sources"))
-        for url in files {
+        let files = try await FileManager.default.contentsOfDirectory(at: runnerPackagePath.appending("Sources"))
+        for path in files {
             try Task.checkCancellation()
-            try await FileManager.default.remove(at: url)
+            try await FileManager.default.removeItem(at: path)
         }
+    }
+
+
+    func cleanScriptsWithPlaceholderScript() async throws {
+        try Task.checkCancellation()
+        try await cleanOldScripts()
+        try await FileManager.default.createFile(
+            at: scriptBuildPath(ofType: .topLevel), 
+            with: .init(#"print("Hello SwiftScript!")"#.utf8),
+            replaceExisting: true
+        )
+    }
+
+}
+
+
+
+extension AppEnv {
+
+    struct OriginalCache: Sendable {
+        var config: AppConfig? = nil 
+        var packageManifest: Data? = nil 
+        var installedPackages: [InstalledPackage]? = nil 
+    }
+
+
+    func cacheOriginals(
+        _ items: PartialKeyPath<OriginalCache>...
+    ) async throws -> OriginalCache {
+        
+        try Task.checkCancellation()
+
+        let items = items.isEmpty ? [\.config, \.packageManifest, \.installedPackages] : items
+
+        var cache = OriginalCache()
+
+        for item in items {
+            switch item {
+                case \.config:
+                    cache.config = try await loadAppConfig()
+                case \.packageManifest:
+                    cache.packageManifest = try await loadPackageManifes()
+                case \.installedPackages:
+                    cache.installedPackages = try await loadInstalledPackages()
+                default: break
+            }
+        }
+
+        return cache
+
+    }
+
+
+    func restoreOriginals(_ cache: OriginalCache) async throws {
+
+        try Task.checkCancellation()
+
+        if let config = cache.config {
+            try await saveAppConfig(config)
+        }
+
+        if let manifest = cache.packageManifest {
+            try await manifest.write(to: runnerPackageManifestPath)
+        }
+
+        if let packages = cache.installedPackages {
+            try await saveInstalledPackages(packages)
+        }
+
     }
 
 }

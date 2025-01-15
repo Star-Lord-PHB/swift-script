@@ -8,74 +8,74 @@ import SwiftSyntax
 
 extension AppEnv {
 
-    var tempUrl: URL { appBaseUrl.appendingCompat(path: "temp") }
+    var tempDirPath: FilePath { appBasePath.appending("temp") }
 
-    var runnerPackageUrl: URL { appBaseUrl.appendingCompat(path: "runner") }
+    var runnerPackagePath: FilePath { appBasePath.appending("runner") }
 
-    var runnerPackageManifestUrl: URL { runnerPackageUrl.appendingCompat(path: "Package.swift") }
+    var runnerPackageManifestPath: FilePath { runnerPackagePath.appending("Package.swift") }
 
-    var runnerResolvedPackagesUrl: URL {
-        runnerPackageUrl.appendingCompat(path: "Package.resolved")
+    var runnerResolvedPackagesPath: FilePath {
+        runnerPackagePath.appending("Package.resolved")
     }
 
-    var installedPackageCheckoutsUrl: URL {
-        runnerPackageUrl.appendingCompat(path: ".build/checkouts")
+    var installedPackageCheckoutsPath: FilePath {
+        runnerPackagePath.appending(".build/checkouts")
     }
 
-    var installedPackagesUrl: URL { appBaseUrl.appendingCompat(path: "packages.json") }
+    var installedPackagesPath: FilePath { appBasePath.appending("packages.json") }
 
-    var configFileUrl: URL { appBaseUrl.appendingCompat(path: "config.json") }
+    var configFilePath: FilePath { appBasePath.appending("config.json") }
 
-    var execUrl: URL { appBaseUrl.appendingCompat(path: "exec") }
+    var execPath: FilePath { appBasePath.appending("exec") }
 
-    var executableProductUrl: URL {
-        runnerPackageUrl.appendingCompat(path: ".build/release/Runner")
+    var executableProductPath: FilePath {
+        runnerPackagePath.appending(".build/release/Runner")
     }
 
-    var processLockUrl: URL {
-        appBaseUrl.appendingCompat(path: "lock.lock")
+    var processLockPath: FilePath {
+        appBasePath.appending("lock.lock")
     }
 
     var packageSearchListUrl: URL { 
         .init(string: "https://raw.githubusercontent.com/SwiftPackageIndex/PackageList/refs/heads/main/packages.json")!
     }
 
-    func makeTempFolder() async throws -> URL {
+    func makeTempFolder() async throws -> FilePath {
         try Task.checkCancellation()
-        let url = tempUrl.appendingCompat(path: UUID().uuidString)
-        try await FileManager.default.createDirectory(at: url)
-        return url
+        let path = tempDirPath.appending(UUID().uuidString)
+        try await FileManager.default.createDirectory(at: path)
+        return path
     }
 
-    func withTempFolder<R>(operation: (URL) async throws -> R) async throws -> R {
-        let url = try await makeTempFolder()
+    func withTempFolder<R>(operation: (FilePath) async throws -> R) async throws -> R {
+        let filePath = try await makeTempFolder()
         do {
             try Task.checkCancellation()
-            let result = try await operation(url)
-            try await FileManager.default.remove(at: url)
+            let result = try await operation(filePath)
+            try await FileManager.default.removeItem(at: filePath)
             return result
         } catch {
-            try await FileManager.default.remove(at: url)
+            try await FileManager.default.removeItem(at: filePath)
             throw error
         }
     }
 
-    func scriptBuildUrl(ofType type: ScriptType) -> URL {
+    func scriptBuildPath(ofType type: ScriptType) -> FilePath {
         let name = switch type {
             case .mainEntry: "Runner.swift"
             case .topLevel: "main.swift"
         }
-        return runnerPackageUrl
-            .appendingCompat(path: "Sources")
-            .appendingCompat(path: name)
+        return runnerPackagePath
+            .appending("Sources")
+            .appending(name)
     }
 
-    func makeExecTempUrl() -> URL {
-        execUrl.appendingCompat(path: UUID().uuidString)
+    func makeExecTempPath() -> FilePath {
+        execPath.appending(UUID().uuidString)
     }
 
-    func packageCheckoutUrl(of packageIdentity: String) -> URL {
-        installedPackageCheckoutsUrl.appendingCompat(path: packageIdentity)
+    func packageCheckoutPath(of packageIdentity: String) -> FilePath {
+        installedPackageCheckoutsPath.appending(packageIdentity)
     }
 
 }

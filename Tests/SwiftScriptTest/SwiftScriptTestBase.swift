@@ -1,4 +1,5 @@
 import FoundationPlusEssential
+import FileManagerPlus
 import Testing
 import SwiftCommand
 @testable import SwiftScript
@@ -13,9 +14,9 @@ class SwiftScriptTestBase {
 
         try await Task.sleep(nanoseconds: .random(in: 0 ... 1_000_000))
 
-        let baseDir = FileManager.default.temporaryDirectory
-            .appending(component: "com.serika.swift-script")
-            .appendingPathComponent(
+        let baseDir = FileManager.default.temporaryDirectoryFilePath
+            .appending("com.serika.swift-script")
+            .appending(
                 UUID().uuidString + UInt.random(in: UInt.min ... UInt.max).description
             )
 
@@ -30,7 +31,7 @@ class SwiftScriptTestBase {
 
 
     deinit {
-        try? FileManager.default.removeItem(at: appEnv.appBaseUrl)
+        try? FileManager.default.removeItem(at: appEnv.appBasePath)
     }
 
 }
@@ -44,18 +45,19 @@ extension SwiftScriptTestBase {
 
     func setupAppFolderWithTemplate(ofName name: String) async throws {
 
-        let template = Bundle.module.resourceURL!
+        let template = try Bundle.module.resourceURL!
             .appendingPathComponent("AppFolderTemplates/\(name)")
+            .assertAsFilePath()
 
-        for content in try await FileManager.default.directoryEntries(at: template)  {
-            try await FileManager.default.copy(
-                content, 
-                to: appEnv.appBaseUrl.appendingCompat(path: content.lastPathComponent)
+        for content in try await FileManager.default.contentsOfDirectory(at: template)  {
+            try await FileManager.default.copyItem(
+                at: content, 
+                to: appEnv.appBasePath.appending(content.lastComponent!)
             )
         }
 
         guard let cmd = Command.findInPath(withName: "swift")?
-            .setCWD(.init(appEnv.runnerPackageUrl.compatPath(percentEncoded: false)))
+            .setCWD(appEnv.runnerPackagePath)
             .addArguments("package", "resolve")
         else {
             throw ExternalCommandError.commandNotFound("swift")
@@ -103,11 +105,11 @@ extension SwiftScriptTestBase {
 
         let installedPackages = try await JSONDecoder().decode(
             [InstalledPackage].self, 
-            from: .read(contentsOf: appEnv.installedPackagesUrl)
+            from: .read(contentAt: appEnv.installedPackagesPath)
         )
 
         guard let cmd = Command.findInPath(withName: "swift")?
-            .setCWD(.init(appEnv.runnerPackageUrl.compatPath(percentEncoded: false)))
+            .setCWD(.init(appEnv.runnerPackagePath.string))
             .addArguments("package", "show-dependencies", "--format", "json")
         else {
             throw ExternalCommandError.commandNotFound("swift")

@@ -15,14 +15,14 @@ struct SwiftScriptConfig: VerboseLoggableCommand {
     func wrappedRun() async throws {
         let config = try await appEnv.loadAppConfig()
 #if os(macOS)
-        printFromStart(
+        print(
             """
             swift tools version: \(config.swiftVersion)
             macOS min support version: \(config.macosVersion)
             """
         )
 #else
-        printFromStart(
+        print(
             """
             swift tools version: \(config.swiftVersionStr)
             """
@@ -48,51 +48,56 @@ struct SwiftScriptConfigSet: VerboseLoggableCommand {
     @Flag(name: .long)
     var verbose: Bool = false
 
+    @Flag(help: "If set, will not build the package after installation (NOT RECOMMENDED! Aimed only for faster testing)")
+    var noBuild: Bool = false
+
     var appEnv: AppEnv = .default
+    var logger: Logger = .init()
 
 
-#if os(macOS)
     func wrappedRun() async throws {
 
         guard swiftVersion != nil || macosVersion != nil else {
-            warningLog("No config update specified")
+            logger.printWarning("No config update specified")
             throw ExitCode.success
         }
 
-        printLog("Loading current configuration")
-        var config = try await appEnv.loadAppConfig()
+        logger.printDebug("Loading original configuration and package manifest ...")
+        let original = try await appEnv.cacheOriginals(\.config, \.packageManifest)
+
+        logger.printDebug("Loading installed packages ...")
+        let installedPackages = try await appEnv.loadInstalledPackages()
+
+        var config = original.config!
 
         if let swiftVersion = swiftVersion {
-            printLog("Changing swift tools version from \(config.swiftVersion) to \(swiftVersion)")
+            logger.printDebug("Changing swift tools version from \(config.swiftVersion) to \(swiftVersion)")
             config.swiftVersion = swiftVersion
         }
+#if os(macOS)
         if let macosVersion = macosVersion {
-            printLog("Changing macOS min support version from \(config.macosVersion) to \(macosVersion)")
+            logger.printDebug("Changing macOS min support version from \(config.macosVersion) to \(macosVersion)")
             config.macosVersion = macosVersion
         }
+#endif // os(macOS)
 
-        printLog("Saving updated configuration")
-        try await appEnv.saveAppConfig(config)
-
-    }
-#else
-    func wrappedRun() async throws {
-        
-        guard swiftVersion != nil else {
-            printFromStart("No config update specified")
-            return 
+        registerCleanUp(when: .interrupt) { 
+            logger.printDebug("restoring original configuration and package manifest ...")
+            try? await appEnv.restoreOriginals(original)
         }
 
-        var config = try await appEnv.loadAppConfig()
-
-        if let swiftVersion = swiftVersion {
-            printLog("Changing swift tools version from \(config.swiftVersion) to \(swiftVersion)")
-            config.swiftVersion = swiftVersion
-        }
-
+        logger.printDebug("Saving updated configuration")
         try await appEnv.saveAppConfig(config)
 
+        logger.printDebug("Updating runner package manifest")
+        try await appEnv.updatePackageManifest(installedPackages: installedPackages, config: config)
+
+        if !noBuild {
+            print("Full Re-Building...")
+            try await appEnv.cleanRunnerPackage()
+            try await appEnv.buildRunnerPackage(verbose: true)
+        } 
+
     }
-#endif
 
 }

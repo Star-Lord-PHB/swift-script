@@ -1,13 +1,13 @@
 {
-  "originHash" : "6e8416ead9b219e8eeeb60dc2ad6d2edd399aec1520cb53fa06ac9b4963ca7f9",
+  "originHash" : "1e909b9eedef8c4c34f4c11cfab10e311dae4173d17e247d85206db0c242ad4c",
   "pins" : [
     {
-      "identity" : "foundationplus",
+      "identity" : "foundation-plus",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/Star-Lord-PHB/FoundationPlus.git",
+      "location" : "https://github.com/Star-Lord-PHB/foundation-plus.git",
       "state" : {
-        "revision" : "56145943625db543ad7c9fbfe8262f8fba440bfd",
-        "version" : "0.1.1"
+        "revision" : "3117e01f6d02a082bd412cea867df6fb72a2078f",
+        "version" : "0.2.0"
       }
     },
     {
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-async-algorithms",
       "state" : {
-        "revision" : "5c8bd186f48c16af0775972700626f0b74588278",
-        "version" : "1.0.2"
+        "revision" : "4c3ea81f81f0a25d0470188459c6d4bf20cf2f97",
+        "version" : "1.0.3"
       }
     },
     {
@@ -33,8 +33,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Star-Lord-PHB/swift-codable-macro.git",
       "state" : {
-        "revision" : "30bca287ab96a31a8e8cb7ed899387592a1418cf",
-        "version" : "1.0.3"
+        "revision" : "c2d0b7652b420745aaca49da674348ff833ee218",
+        "version" : "1.0.5"
       }
     },
     {
@@ -62,15 +62,6 @@
       "state" : {
         "revision" : "c8a44d836fe7913603e246acab7c528c2e780168",
         "version" : "1.4.0"
-      }
-    },
-    {
-      "identity" : "swift-testing",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/swiftlang/swift-testing.git",
-      "state" : {
-        "branch" : "main",
-        "revision" : "1df9545d99b80d8b3ede1c6f3dda1c4087e829af"
       }
     },
     {

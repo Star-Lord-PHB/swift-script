@@ -9,9 +9,6 @@ import ArgumentParser
 import FoundationPlus
 import SwiftCommand
 
-let green: String = "\u{001B}[0;32m"
-let reset: String = "\u{001B}[0;0m"
-
 
 struct SwiftScriptInfo: VerboseLoggableCommand {
     
@@ -19,7 +16,7 @@ struct SwiftScriptInfo: VerboseLoggableCommand {
     
     @Argument(
         help: "show detail information of a specified package",
-        transform: {  $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        transform: { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
     )
     var package: String
 
@@ -30,33 +27,34 @@ struct SwiftScriptInfo: VerboseLoggableCommand {
     var verbose: Bool = false
 
     var appEnv: AppEnv = .default
+    var logger: Logger = .init()
     
 
     func wrappedRun() async throws {
         
-        let packageCheckoutPath = appEnv.packageCheckoutUrl(of: package)
+        let packageCheckoutPath = appEnv.packageCheckoutPath(of: package)
         
         try await appEnv.withProcessLock {
             
-            guard await FileManager.default.fileExistsAsync(at: packageCheckoutPath) else {
+            guard await FileManager.default.fileExists(at: packageCheckoutPath) else {
                 throw CLIError(reason: "Package \(package) is not installed")
             }
             
-            printLog("Loading installation info of package \(package)")
+            logger.printDebug("Loading installation info of package \(package)")
             
             guard
                 let packageInstallInfo = try await appEnv.loadInstalledPackages()
                     .first(where: { $0.identity == package })
             else { throw CLIError(reason: "Package \(package) is not installed") }
             
-            printLog("Loading description of package \(package)")
+            logger.printDebug("Loading description of package \(package)")
             
             let packageDescription = try await appEnv.loadPackageDescription(
                 of: packageCheckoutPath,
                 as: PackageDescription.self
             )
             
-            printLog("Loading resolved version of package \(package)")
+            logger.printDebug("Loading resolved version of package \(package)")
             
             guard
                 let resolvedVersion = try await appEnv.loadResolvedDependencyVersionList()
@@ -72,10 +70,10 @@ struct SwiftScriptInfo: VerboseLoggableCommand {
 
             if showDependencies {
 
-                printLog("Loading dependencies of package \(package)")
+                logger.printDebug("Loading dependencies of package \(package)")
                 let dependenciesStr = try await appEnv.loadPackageDependenciesText(of: packageCheckoutPath)
                 
-                printFromStart("""
+                print("""
                     
                     \("Package identity:".green) \(package)
                     \("Package name:".green) \(packageDescription.name)
@@ -92,7 +90,7 @@ struct SwiftScriptInfo: VerboseLoggableCommand {
 
             } else {
 
-                printFromStart("""
+                print("""
                     
                     \("Package identity:".green) \(package)
                     \("Package name:".green) \(packageDescription.name)

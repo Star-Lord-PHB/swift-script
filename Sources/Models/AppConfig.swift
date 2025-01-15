@@ -7,7 +7,6 @@
 
 import Foundation
 import FileManagerPlus
-import CodableMacro
 
 
 struct AppConfig: Equatable {

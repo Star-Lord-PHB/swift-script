@@ -1,4 +1,5 @@
 import Foundation
+import FileManagerPlus
 import SwiftCommand
 import ArgumentParser
 
@@ -92,17 +93,17 @@ extension Command {
     }
 
 
-    func getOutputWithFile(at tempFileUrl: URL) async throws -> Data {
-        try await FileManager.default.createFile(at: tempFileUrl, replaceExisting: true)
+    func getOutputWithFile(at tempFilePath: FilePath) async throws -> Data {
+        try await FileManager.default.createFile(at: tempFilePath, replaceExisting: true)
         return try await execute {
             try await self
-                .setStdout(.write(toFile: .init(tempFileUrl.compatPath(percentEncoded: false))))
+                .setStdout(.write(toFile: tempFilePath))
                 .setStderr(.pipe)
                 .wait()
             try Task.checkCancellation()
-            return try await .read(contentsOf: tempFileUrl)
+            return try await .read(contentAt: tempFilePath)
         } finally: {
-            try FileManager.default.removeItem(at: tempFileUrl)
+            try FileManager.default.removeItem(at: tempFilePath)
         }
     }
     

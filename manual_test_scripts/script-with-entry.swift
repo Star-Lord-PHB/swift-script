@@ -9,7 +9,7 @@ struct Runner {
         let cwd = FileManager.default.currentDirectoryPath
         print(
             """
-            script with top level entry point executed 
+            script with main entry point executed 
             cwd: \(cwd)
             os: \(ProcessInfo.processInfo.operatingSystemVersionString)
             """

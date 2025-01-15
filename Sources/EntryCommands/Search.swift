@@ -27,6 +27,7 @@ struct SwiftScriptSearch: VerboseLoggableCommand {
     var verbose: Bool = false
 
     var appEnv: AppEnv = .default
+    var logger: Logger = .init()
 
 
     func validate() throws {
@@ -58,13 +59,13 @@ struct SwiftScriptSearch: VerboseLoggableCommand {
 
         let tag = try await printInfoArguments.version.unwrap(
             or: { 
-                printLog("Version not specified, fetching latest version ...")
+                logger.printDebug("Version not specified, fetching latest version ...")
                 return try await appEnv.fetchLatestVersionStr(of: url) 
             }
         )
 
         if printInfoArguments.version != nil {
-            printLog("Checking if version \(tag) exists ...")
+            logger.printDebug("Checking if version \(tag) exists ...")
             guard try await appEnv.fetchRemoteTags(at: url).contains(tag) else {
                 throw CLIError(reason: "Version \(tag) is not found in remote repository")
             }
@@ -72,13 +73,24 @@ struct SwiftScriptSearch: VerboseLoggableCommand {
             print("Latest Version: \(tag)")
         }
         
-        let packageFullDescription = try await withLoadingIndicator("Gathering Package Info ...") {
-            try await appEnv.fetchPackageFullDescription(
+        let packageFullDescription: PackageFullDescription
+        if verbose {
+            logger.printDebug("Gathering Package Info ...")
+            packageFullDescription = try await appEnv.fetchPackageFullDescription(
                 at: url, 
                 tag: tag,
                 includeDependencies: printInfoArguments.showDependencies, 
                 verbose: verbose
             )
+        } else {
+            packageFullDescription = try await withLoadingIndicator("Gathering Package Info ...") {
+                try await appEnv.fetchPackageFullDescription(
+                    at: url, 
+                    tag: tag,
+                    includeDependencies: printInfoArguments.showDependencies, 
+                    verbose: verbose
+                )
+            }
         }
 
         let platformStr = if packageFullDescription.platforms.isEmpty {
@@ -88,7 +100,7 @@ struct SwiftScriptSearch: VerboseLoggableCommand {
         }
 
         if printInfoArguments.showDependencies {
-            printFromStart("""
+            print("""
 
                 \("Identity".green): \(packageFullDescription.identity)
                 \("Name".green): \(packageFullDescription.name)
@@ -101,7 +113,7 @@ struct SwiftScriptSearch: VerboseLoggableCommand {
                 """
             )
         } else {
-            printFromStart("""
+            print("""
 
                 \("Identity".green): \(packageFullDescription.identity)
                 \("Name".green): \(packageFullDescription.name)
@@ -120,9 +132,9 @@ struct SwiftScriptSearch: VerboseLoggableCommand {
             try await appEnv.fetchVersionList(of: url, verbose: verbose)
         }
         if listVersionsArguments.all {
-            printFromStart(versions.map(\.str).joined(separator: "\n"))
+            print(versions.map(\.str).joined(separator: "\n"))
         } else {
-            printFromStart(
+            print(
                 versions.suffix(listVersionsArguments.limit)
                     .map(\.str)
                     .joined(separator: "\n")

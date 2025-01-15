@@ -27,18 +27,19 @@ struct SwiftScriptUninstall: VerboseLoggableCommand {
     var noBuild: Bool = false
 
     var appEnv: AppEnv = .default
+    var logger: Logger = .init()
 
     
     func wrappedRun() async throws {
         
         try await appEnv.withProcessLock {
 
-            printLog("Loading installed packages")
-            let installedPackages = try await appEnv.loadInstalledPackages()
-            let identitiesToRemove = Set(identities)
-            
-            printLog("Caching current runner package manifest")
-            let originalPackageManifest = try await appEnv.loadPackageManifes()
+            let identitiesToRemove = identities.toSet()
+
+            logger.printDebug("Loading package manifest and installed packages")
+            let original = try await appEnv.cacheOriginals(\.packageManifest, \.installedPackages)
+
+            let installedPackages = original.installedPackages!
 
             let updatedPackages = installedPackages.filter { 
                 !identitiesToRemove.contains($0.identity) 
@@ -54,27 +55,26 @@ struct SwiftScriptUninstall: VerboseLoggableCommand {
                 )
             }
             
-            printLog("Loading configuration")
+            logger.printDebug("Loading configuration")
             let config = try await appEnv.loadAppConfig()
             
-            printFromStart("Removing \(identities.joined(separator: ", "))")
+            print("Removing \(identities.joined(separator: ", "))")
             
             registerCleanUp {
-                printFromStart("Restoring original package manifest and installed packages")
-                try? await originalPackageManifest.write(to: appEnv.runnerPackageManifestUrl)
-                try? await appEnv.saveInstalledPackages(installedPackages)
+                logger.printDebug("Restoring original package manifest and installed packages")
+                try? await appEnv.restoreOriginals(original)
             }
             
-            printFromStart("Saving updated installed packages")
+            print("Saving updated installed packages")
             try await appEnv.saveInstalledPackages(updatedPackages)
-            printFromStart("Saving updated runner package manifest")
+            print("Saving updated runner package manifest")
             try await appEnv.updatePackageManifest(installedPackages: updatedPackages, config: config)
             
             if noBuild {
-                printFromStart("Resolving (will not build since `--no-build` is set)")
+                print("Resolving (will not build since `--no-build` is set)")
                 try await appEnv.resolveRunnerPackage(verbose: verbose)
             } else {
-                printFromStart("Building")
+                print("Building")
                 try await appEnv.buildRunnerPackage(arguments: buildArguments, verbose: true)
             }
             

@@ -1,5 +1,6 @@
 import Foundation
 import ConcurrencyPlus
+import FileManagerPlus
 
 
 final class ProcessLock: Sendable {
@@ -10,14 +11,14 @@ final class ProcessLock: Sendable {
         self.path = path
     }
 
-    convenience init(path: URL = AppEnv.default.processLockUrl) {
-        self.init(path: path.compatPath(percentEncoded: false))
+    convenience init(path: FilePath = AppEnv.default.processLockPath) {
+        self.init(path: path.string)
     }
 
 
     func withLock<T>(_ operation: () async throws -> T) async throws -> T {
         
-        let fd = try await launchTask(on: .io) {
+        let fd = try await Task.launch(on: .io) {
             let fd = open(self.path, O_CREAT | O_RDWR, 0o666)
             guard fd >= 0 else {
                 throw Error(code: errno, message: "Failed to open lock file")
@@ -46,7 +47,7 @@ final class ProcessLock: Sendable {
                 warned = true
             }
 
-            let (result, localErrno) = await launchTask(on: .io) { 
+            let (result, localErrno) = await Task.launch(on: .io) { 
                 let result = flock(fd, LOCK_EX | LOCK_NB) 
                 return (result, errno)
             }
@@ -69,7 +70,7 @@ final class ProcessLock: Sendable {
         return try await execute {
             try await operation()
         } finally: {
-            await launchTask(on: .io) { 
+            await Task.launch(on: .io) { 
                 flock(fd, LOCK_UN)
                 close(fd) 
             }

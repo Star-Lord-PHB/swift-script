@@ -17,9 +17,9 @@ struct SwiftScriptRun: VerboseLoggableCommand {
     @Argument(
         help: "path to the script", 
         completion: .file(extensions: ["swift"]),
-        transform: URL.init(fileURLWithPath:)
+        transform: FilePath.init(_:)
     )
-    var scriptPath: URL
+    var scriptPath: FilePath
     
     @Argument(parsing: .allUnrecognized, help: "Pass arguments through to the script")
     var arguments: [String] = []
@@ -31,40 +31,43 @@ struct SwiftScriptRun: VerboseLoggableCommand {
     var verbose: Bool = false
 
     var appEnv: AppEnv = .default
+    var logger: Logger = .init()
 
     
     func wrappedRun() async throws {
         
-        printLog("Identifying type of script")
+        logger.printDebug("Identifying type of script")
         let scriptType = try await ScriptType.of(fileAt: scriptPath)
-        printLog("Script type identified as \"\(scriptType)\"")
+        logger.printDebug("Script type identified as \"\(scriptType)\"")
         
-        let scriptBuildUrl = appEnv.scriptBuildUrl(ofType: scriptType)
-        let scriptExecUrl = appEnv.makeExecTempUrl()
-        printLog("Allocated executation path: \(scriptExecUrl.compatPath(percentEncoded: false))")
+        let scriptBuildPath = appEnv.scriptBuildPath(ofType: scriptType)
+        let scriptExecPath = appEnv.makeExecTempPath()
+        logger.printDebug("Allocated executation path: \(scriptExecPath)")
         
-        registerCleanUp(when: .always) { [verbose] in
-            if verbose { printFromStart("Cleaning script executable".skyBlue) }
-            try? await FileManager.default.remove(at: scriptExecUrl)
+        registerCleanUp(when: .always) {
+            logger.printDebug("Cleaning script executable")
+            try? await FileManager.default.removeItem(at: scriptExecPath)
+            logger.printDebug("Cleaning script source")
+            try? await appEnv.cleanScriptsWithPlaceholderScript()
         }
         
         try await appEnv.withProcessLock {
 
-            printLog("Cleaning old script")
+            logger.printDebug("Cleaning old script")
             try await appEnv.cleanOldScripts()
-            printLog("Copying script to build path")
-            try await FileManager.default.copy(scriptPath, to: scriptBuildUrl)
+            logger.printDebug("Copying script to build path")
+            try await FileManager.default.copyItem(at: scriptPath, to: scriptBuildPath)
             
-            printLog("Building runner with arguments: \(swiftArguments)")
+            logger.printDebug("Building runner with arguments: \(swiftArguments)")
             try await appEnv.buildRunnerPackage(arguments: swiftArguments, verbose: verbose)
             
-            printLog("Moving executable to allocated execution path")
-            try await FileManager.default.move(appEnv.executableProductUrl, to: scriptExecUrl)
+            logger.printDebug("Moving executable to allocated execution path")
+            try await FileManager.default.moveItem(at: appEnv.executableProductPath, to: scriptExecPath)
             
         }
         
-        printLog("Executing script at \(scriptExecUrl.compatPath(percentEncoded: false)) with arguments: \(arguments)")
-        try await appEnv.runExecutable(at: scriptExecUrl, arguments: arguments)
+        logger.printDebug("Executing script at \(scriptExecPath) with arguments: \(arguments)")
+        try await appEnv.runExecutable(at: scriptExecPath, arguments: arguments)
         
     }
     

@@ -36,7 +36,7 @@ enum PackageManifestTemplate {
             name: "swift-script-runner",
             platforms: [\#(platformStr(from: config))],
             dependencies: [
-                \#(installedPackages.map(to: \.dependencyCommand).joined(separator: ","))
+                \#(installedPackages.map(\.dependencyCommand).joined(separator: ","))
             ],
             targets: [
                 // Targets are the basic building blocks of a package, defining a module or a test suite.

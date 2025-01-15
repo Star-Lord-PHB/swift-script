@@ -17,6 +17,7 @@ nonisolated(unsafe) private var normalCleanUpOperations: [@MainActor () async ->
 protocol VerboseLoggableCommand: AsyncParsableCommand {
     var appEnv: AppEnv { get set }
     var verbose: Bool { get }
+    var logger: Logger { get }
     mutating func wrappedRun() async throws
 }
 
@@ -24,6 +25,7 @@ protocol VerboseLoggableCommand: AsyncParsableCommand {
 extension VerboseLoggableCommand {
     
     var verbose: Bool { false }
+    var logger: Logger { .init() }
 
     init(appEnv: AppEnv) {
         self.init()
@@ -36,6 +38,8 @@ extension VerboseLoggableCommand {
         do {
 
             SignalHandler.startSignalListening()
+
+            logger.initialize(verbose: verbose)
 
             let localSelf = SendableWrapper(value: self)
             let task = Task {
@@ -99,18 +103,6 @@ extension VerboseLoggableCommand {
             }
             try await Task.sleep(nanoseconds: 1_000_000_000)
         }
-    }
-    
-    
-    func printLog(_ message: String) {
-        if verbose {
-            printFromStart(message.skyBlue)
-        }
-    }
-    
-    
-    func warningLog(_ message: String) {
-        printStdErr(message.yellow)
     }
     
     

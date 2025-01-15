@@ -7,7 +7,15 @@ import ArgumentParser
 extension AppEnv {
 
     func resolveRunnerPackage(verbose: Bool = false) async throws {
-        try await resolvePackage(at: runnerPackageUrl, verbose: verbose)
+        try await resolvePackage(at: runnerPackagePath, verbose: verbose)
+    }
+
+
+    func cleanRunnerPackage() async throws {
+        try await Command.requireInPath("swift")
+            .setCWD(runnerPackagePath)
+            .addArguments("package", "clean")
+            .wait()
     }
 
 
@@ -18,7 +26,7 @@ extension AppEnv {
         try await Command.requireInPath("swift")
             .addArguments(
                 "build",
-                "--package-path", runnerPackageUrl.compatPath(percentEncoded: false),
+                "--package-path", runnerPackagePath.string,
                 "-c", "release"
             )
             .wait(printingOutput: verbose)
@@ -137,8 +145,8 @@ extension AppEnv {
     }
 
 
-    func runExecutable(at executableUrl: URL, arguments: [String]) async throws {
-        try await Command(executablePath: .init(executableUrl.compatPath(percentEncoded: false)))
+    func runExecutable(at executablePath: FilePath, arguments: [String]) async throws {
+        try await Command(executablePath: .init(executablePath.string))
             .addArguments(arguments)
             .wait()
     }
@@ -148,22 +156,22 @@ extension AppEnv {
         try await Command.requireInPath("swift")
             .addArguments(
                 "package", "show-dependencies",
-                "--package-path", runnerPackageUrl.compatPath(percentEncoded: false)
+                "--package-path", runnerPackagePath.string
             )
             .wait()
     }
 
 
-    func loadPackageDependenciesText(of packageUrl: URL) async throws -> String {
+    func loadPackageDependenciesText(of packagePath: FilePath) async throws -> String {
 
-        try await resolvePackage(at: packageUrl)
+        try await resolvePackage(at: packagePath)
 
         try Task.checkCancellation()
 
         let data = try await Command.requireInPath("swift")
-            .setCWD(.init(packageUrl.compatPath(percentEncoded: false)))
+            .setCWD(packagePath)
             .addArguments("package", "show-dependencies")
-            .getOutputWithFile(at: tempUrl.appendingCompat(path: UUID().uuidString))
+            .getOutputWithFile(at: tempDirPath.appending(UUID().uuidString))
 
         return String(data: data, encoding: .utf8) ?? ""
 
@@ -171,14 +179,14 @@ extension AppEnv {
 
 
     func loadPackageDescription<T: Decodable>(
-        of packageUrl: URL,
+        of packagePath: FilePath,
         as type: T.Type = T.self
     ) async throws -> T {
 
         let data = try await Command.requireInPath("swift")
-            .setCWD(.init(packageUrl.compatPath(percentEncoded: false)))
+            .setCWD(packagePath)
             .addArguments("package", "describe", "--type", "json")
-            .getOutputWithFile(at: tempUrl.appendingCompat(path: UUID().uuidString))
+            .getOutputWithFile(at: tempDirPath.appending(UUID().uuidString))
 
         return try JSONDecoder().decode(T.self, from: data)
 
@@ -186,11 +194,11 @@ extension AppEnv {
 
 
     func fetchSwiftVersion() async throws -> Version {
-        try await withTempFolder { folderUrl in
-            try await createNewPackage(at: folderUrl)
+        try await withTempFolder { folderPath in
+            try await createNewPackage(at: folderPath)
             try Task.checkCancellation()
             let versionStr = try await Command.requireInPath("swift")
-                .setCWD(.init(folderUrl.compatPath(percentEncoded: false)))
+                .setCWD(folderPath)
                 .addArguments("package", "tools-version")
                 .getOutput().stdout
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -234,7 +242,7 @@ extension AppEnv {
 
     func clonePackage(
         _ remoteUrl: URL, 
-        to localUrl: URL, 
+        to localPath: FilePath, 
         tag: String? = nil,
         verbose: Bool = false
     ) async throws {
@@ -246,26 +254,26 @@ extension AppEnv {
         }
 
         try await Command.requireInPath("git")
-            .setCWD(.init(localUrl.compatPath(percentEncoded: false)))
+            .setCWD(localPath)
             .addArguments(arguments)
             .wait(printingOutput: verbose)
 
     }
 
 
-    func createNewPackage(at url: URL) async throws {
+    func createNewPackage(at path: FilePath) async throws {
         try await Command.requireInPath("swift")
-            .setCWD(.init(url.compatPath(percentEncoded: false)))
+            .setCWD(path)
             .addArguments("package", "init")
             .wait(printingOutput: false)
     }
 
 
-    func resolvePackage(at url: URL, verbose: Bool = false) async throws {
+    func resolvePackage(at path: FilePath, verbose: Bool = false) async throws {
         try await Command.requireInPath("swift")
             .addArguments(
                 "package", "resolve",
-                "--package-path", url.compatPath(percentEncoded: false)
+                "--package-path", path.string
             )
             .wait(printingOutput: verbose)
     }
@@ -277,7 +285,7 @@ extension AppEnv {
             .addArguments(
                 "ls-remote", "--tags", url.absoluteString
             )
-            .getOutputWithFile(at: tempUrl.appendingCompat(path: UUID().uuidString))
+            .getOutputWithFile(at: tempDirPath.appending(UUID().uuidString))
 
         let output = String(data: data, encoding: .utf8) ?? ""
         if verbose {

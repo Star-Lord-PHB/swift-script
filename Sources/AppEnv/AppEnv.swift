@@ -1,18 +1,19 @@
 import Foundation
+import FileManagerPlus
 
 
 final class AppEnv: Sendable {
 
-    let appBaseUrl: URL 
+    let appBasePath: FilePath 
     let processLock: ProcessLock
 
-    init(base: URL = defaultBaseUrl) {
-        self.appBaseUrl = base
-        self.processLock = .init(path: appBaseUrl.appendingCompat(path: "lock.lock"))
+    init(base: FilePath = defaultBasePath) {
+        self.appBasePath = base
+        self.processLock = .init(path: appBasePath.appending("lock.lock"))
     }
 
-    static let defaultBaseUrl: URL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingCompat(path: ".swift-script")
+    static let defaultBasePath: FilePath = FileManager.default.homeDirectoryFilePathForCurrentUser
+        .appending(".swift-script")
 
     static let `default` = AppEnv()
 
@@ -36,13 +37,13 @@ extension AppEnv: Codable {
 
     func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: Keys.self)
-        try container.encode(appBaseUrl, forKey: .appBaseUrl)
+        try container.encode(appBasePath, forKey: .appBaseUrl)
     }
 
     convenience init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: Keys.self)
-        let appBaseUrl = try container.decode(URL.self, forKey: .appBaseUrl)
-        self.init(base: appBaseUrl)
+        let appBasePath = try container.decode(FilePath.self, forKey: .appBaseUrl)
+        self.init(base: appBasePath)
     }
 
 }

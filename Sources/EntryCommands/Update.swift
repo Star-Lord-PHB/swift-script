@@ -36,6 +36,7 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
     var noBuild: Bool = false
 
     var appEnv: AppEnv = .default
+    var logger: Logger = .init()
     
     
     func validate() throws {
@@ -54,7 +55,7 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
         
         if let package {
             
-            printLog("Loading installed packages")
+            logger.printDebug("Loading installed packages")
             guard
                 let url = try await appEnv.loadInstalledPackages()
                     .first(where: { $0.identity == package })?.url
@@ -74,13 +75,13 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
             
             try await appEnv.withProcessLock {
 
-                printLog("Loading configuration")
+                logger.printDebug("Loading configuration")
                 let config = try await appEnv.loadAppConfig()
-            
-                printLog("Caching current installed packages")
-                let originalPackages = try await appEnv.loadInstalledPackages()
-                printLog("Caching current runner package manifest")
-                let originalPackageManifest = try await appEnv.loadPackageManifes()
+
+                logger.printDebug("Loading installed packages and package manifest")
+                let original = try await appEnv.cacheOriginals(\.installedPackages, \.packageManifest)
+
+                let originalPackages = original.installedPackages!
                 
                 let updatedPackages = try await updatePackages(originalPackages, config: config)
                 
@@ -89,11 +90,11 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
                 }
                 
                 guard modifiedPackages.isNotEmpty else {
-                    printFromStart("No updatable packages found")
+                    print("No updatable packages found")
                     throw ExitCode.success
                 }
                 
-                printFromStart("""
+                print("""
                     Package requirements will be updated as follow:
                     \(
                         modifiedPackages
@@ -107,26 +108,26 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
                     print("Proceed? (y/n): ", terminator: "")
                     let input = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                     guard input == "y" || input == "yes" else {
-                        printFromStart("Aborted")
+                        print("Aborted")
                         throw ExitCode.success
                     }
                 }
                 
                 registerCleanUp {
-                    try? await originalPackageManifest.write(to: appEnv.runnerPackageManifestUrl)
-                    try? await appEnv.saveInstalledPackages(originalPackages)
+                    logger.printDebug("Restoring original package manifest and installed packages ...")
+                    try? await appEnv.restoreOriginals(original)
                 }
                 
-                printFromStart("Saving updated installed packages")
+                print("Saving updated installed packages")
                 try await appEnv.saveInstalledPackages(updatedPackages)
-                printFromStart("Saving updated runner package manifest")
+                print("Saving updated runner package manifest")
                 try await appEnv.updatePackageManifest(installedPackages: updatedPackages, config: config)
                 
                 if noBuild {
-                    printFromStart("Resolving (will not build since `--no-build` is set)")
+                    print("Resolving (will not build since `--no-build` is set)")
                     try await appEnv.resolveRunnerPackage(verbose: verbose)
                 } else {
-                    printFromStart("Building")
+                    print("Building")
                     try await appEnv.buildRunnerPackage(arguments: buildArguments, verbose: true)
                 }
                 

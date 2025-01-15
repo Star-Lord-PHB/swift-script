@@ -24,9 +24,9 @@ extension ScriptType: CustomStringConvertible {
 
 extension ScriptType {
 
-    static func of(fileAt url: URL) async throws -> ScriptType {
+    static func of(fileAt path: FilePath) async throws -> ScriptType {
 
-        guard let scriptContent = try await String(data: .read(contentsOf: url), encoding: .utf8)
+        guard let scriptContent = try await String(data: .read(contentAt: path), encoding: .utf8)
         else {
             fatalError("Fail to read contents of the script")
         }
