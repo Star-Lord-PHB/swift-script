@@ -9,6 +9,9 @@ import Foundation
 import FileManagerPlus
 import SwiftCommand
 import ArgumentParser
+#if canImport(SwiftGlibc)
+@preconcurrency import SwiftGlibc
+#endif
 
 
 

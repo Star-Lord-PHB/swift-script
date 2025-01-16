@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Star-Lord-PHB/foundation-plus.git",
       "state" : {
-        "revision" : "3117e01f6d02a082bd412cea867df6fb72a2078f",
-        "version" : "0.2.0"
+        "revision" : "ea898fc3ca04f5138829557dce92b480e6782658",
+        "version" : "0.2.1"
       }
     },
     {

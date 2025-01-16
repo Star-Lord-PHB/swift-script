@@ -24,7 +24,7 @@ struct SwiftScriptConfig: VerboseLoggableCommand {
 #else
         print(
             """
-            swift tools version: \(config.swiftVersionStr)
+            swift tools version: \(config.swiftVersion)
             """
         )
 #endif
@@ -57,10 +57,17 @@ struct SwiftScriptConfigSet: VerboseLoggableCommand {
 
     func wrappedRun() async throws {
 
+#if os(macOS)
         guard swiftVersion != nil || macosVersion != nil else {
             logger.printWarning("No config update specified")
             throw ExitCode.success
         }
+#else
+        guard swiftVersion != nil else {
+            logger.printWarning("No config update specified")
+            throw ExitCode.success
+        }
+#endif
 
         logger.printDebug("Loading original configuration and package manifest ...")
         let original = try await appEnv.cacheOriginals(\.config, \.packageManifest)

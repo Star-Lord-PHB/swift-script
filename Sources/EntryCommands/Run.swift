@@ -21,14 +21,17 @@ struct SwiftScriptRun: VerboseLoggableCommand {
     )
     var scriptPath: FilePath
     
-    @Argument(parsing: .allUnrecognized, help: "Pass arguments through to the script")
-    var arguments: [String] = []
-    
     @Option(name: .customLong("Xbuild"), parsing: .singleValue, help: #"Pass flag through to "swift build" command"#)
     var swiftArguments: [String] = []
     
     @Flag(name: .shortAndLong)
     var verbose: Bool = false
+
+    @Flag(name: .shortAndLong, help: "strictly eliminate all console outputs that are not from the script, default to false")
+    var quiet: Bool = false
+
+    @Argument(parsing: .captureForPassthrough, help: "Pass arguments through to the script")
+    var arguments: [String] = []
 
     var appEnv: AppEnv = .default
     var logger: Logger = .init()
@@ -59,7 +62,13 @@ struct SwiftScriptRun: VerboseLoggableCommand {
             try await FileManager.default.copyItem(at: scriptPath, to: scriptBuildPath)
             
             logger.printDebug("Building runner with arguments: \(swiftArguments)")
-            try await appEnv.buildRunnerPackage(arguments: swiftArguments, verbose: verbose)
+            if quiet {
+                try await appEnv.buildRunnerPackage(arguments: swiftArguments, verbose: verbose)
+            } else {
+                try await withLoadingIndicator("Building") {
+                    try await appEnv.buildRunnerPackage(arguments: swiftArguments, verbose: verbose)
+                }
+            }
             
             logger.printDebug("Moving executable to allocated execution path")
             try await FileManager.default.moveItem(at: appEnv.executableProductPath, to: scriptExecPath)

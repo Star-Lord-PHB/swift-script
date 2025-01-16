@@ -7,7 +7,9 @@ extension AppEnv {
 
     private struct AppConfigCodingStructure: Codable {
         var swiftVersion: String?
+#if os(macOS)
         var macosVersion: String?
+#endif
     }
 
     func loadAppConfig() async throws -> AppConfig {
@@ -50,10 +52,16 @@ extension AppEnv {
 
         try Task.checkCancellation()
 
+#if os(macOS)
         let structure = AppConfigCodingStructure(
             swiftVersion: config.swiftVersion.description,
             macosVersion: config.macosVersion.description
         )
+#else
+        let structure = AppConfigCodingStructure(
+            swiftVersion: config.swiftVersion.description
+        )
+#endif
         try await JSONEncoder().encode(structure).write(to: configFilePath)
 
     }

@@ -2,6 +2,9 @@ import FoundationPlusEssential
 import SwiftCommand
 import FileManagerPlus
 import ArgumentParser
+#if !canImport(Darwin)
+import FoundationNetworking
+#endif
 
 
 extension AppEnv {
