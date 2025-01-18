@@ -47,11 +47,18 @@ extension AppEnv {
         } else {
             try await fetchSwiftVersion()
         }
+#if os(macOS)
         let manifest = PackageManifestTemplate.makeRunnerPackageManifest(
             installedPackages: installedPackages,
             swiftVersion: swiftVersion,
             macosVersion: appConfig.macosVersion ?? fetchMacosVersion()
         )
+#else
+        let manifest = PackageManifestTemplate.makeRunnerPackageManifest(
+            installedPackages: installedPackages,
+            swiftVersion: swiftVersion
+        )
+#endif
         try await Data(manifest.utf8).write(to: runnerPackageManifestPath)
     }
 

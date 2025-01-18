@@ -102,7 +102,6 @@ extension SwiftScriptWrappedCommand {
             for operation in interruptCleanUpOperations.reversed() {
                 await operation()
             }
-            try await Task.sleep(nanoseconds: 1_000_000_000)
         }
     }
     
