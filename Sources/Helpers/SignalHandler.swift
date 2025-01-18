@@ -3,7 +3,11 @@ import ConcurrencyPlus
 
 
 private let signalStream = {
+#if os(Windows)
+    let signals = [SIGINT, SIGTERM]
+#else
     let signals = [SIGINT, SIGTERM, SIGHUP, SIGQUIT]
+#endif
     for sig in signals {
         signal(sig, notifySignal(_:))
     }

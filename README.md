@@ -10,7 +10,8 @@ Currently known limitations:
 - [ ] [Swift Package Index](https://swiftpackageindex.com) still does not have APIs available, currently using their [package list repository](https://github.com/SwiftPackageIndex/PackageList/blob/main/packages.json) 
 - [x] ~~Does not support complex semetic version format other than the basic `major.minor.patch` format yet. In other word, formats such as `v1.0.0`, `1.0.0-alpha` are not currently supported~~
 - [ ] No formal installation script yet
-- [ ] Not tested on Linux or Windows yet
+- [x] ~~Not tested on Linux yet~~
+- [ ] Not tested on Windows yet
 - [ ] Does not support customized swift location yet
 - [ ] Does not support module alias yet 
 - [ ] No idea how to support code completion yet
@@ -24,8 +25,10 @@ Currently known limitations:
 First, setup the working folder for the executable by running the script provided in `setup-script` folder. 
 
 ```sh
-# first-time setup
+# first-time setup 
 ./setup-script/dev-setup.sh
+# first-time setup (Windows)
+./setup-script/dev-setup.cmd
 ```
 
 This will create a working folder at `~/.swift-script`
@@ -35,6 +38,8 @@ To fully remove this working folder, use the `dev-clean.sh` script:
 ```sh
 # fully remove the working folder
 ./setup-script/dev-clean.sh
+# fully remove the working folder (Windows)
+./setup-script/dev-clean.cmd
 ```
 
 To reset the working folder (fully remove and then setup again), use the `dev-reset.sh` script:
@@ -42,6 +47,8 @@ To reset the working folder (fully remove and then setup again), use the `dev-re
 ```sh
 # reset the working folder
 ./setup-script/dev-reset.sh
+# reset the working folder (Windows)
+./setup-script/dev-reset.cmd
 ```
 
 #### Build and Run
@@ -51,7 +58,7 @@ Build with standard swift build command:
 ```sh
 # debug mode
 swift build
-# release mode
+# release mode (Not working on Windows Yet)
 swift build -c release 
 ```
 
@@ -61,7 +68,7 @@ Alternatively, you can use `swift run` command to execute it immediately:
 ```sh
 # debug mode
 swift run SwiftScript [args]
-#release mode
+#release mode (Not working on Windows Yet)
 swift run -c release SwiftScript [args]
 ```
 
@@ -70,6 +77,8 @@ To make things easier, there is a script provided in the `manual_test_scripts` f
 ```sh
 ./manual_test_scripts/run [args]
 ```
+
+**_Note that currently this script run the DEBUG executable directly without building, so remember to build in DEBUG mode first before running it._**
 
 ## Usage
 

@@ -1,13 +1,13 @@
 {
-  "originHash" : "1e909b9eedef8c4c34f4c11cfab10e311dae4173d17e247d85206db0c242ad4c",
+  "originHash" : "d9d117d73f70ed14da25127fdfd516f0988a944734b55277fbd3a1536550970c",
   "pins" : [
     {
       "identity" : "foundation-plus",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Star-Lord-PHB/foundation-plus.git",
       "state" : {
-        "revision" : "ea898fc3ca04f5138829557dce92b480e6782658",
-        "version" : "0.2.1"
+        "revision" : "012a2f2b2b26414674194c8a6ceb1729876980f7",
+        "version" : "0.2.2"
       }
     },
     {

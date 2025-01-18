@@ -2,6 +2,10 @@ import Foundation
 import ConcurrencyPlus
 import FileManagerPlus
 
+#if os(Windows)
+import WinSDK
+#endif 
+
 
 final class ProcessLock: Sendable {
 
@@ -15,6 +19,8 @@ final class ProcessLock: Sendable {
         self.init(path: path.string)
     }
 
+
+#if !os(Windows)
 
     func withLock<T>(_ operation: () async throws -> T) async throws -> T {
         
@@ -78,7 +84,93 @@ final class ProcessLock: Sendable {
 
     }
 
+#else 
+
+    func withLock<T>(_ operation: () async throws -> T) async throws -> T {
+
+        let handle = await Task.launch(on: .io) {
+            Data(path.utf8).base64EncodedString().withCString(encodedAs: Unicode.UTF16.self) { ptr in
+               CreateMutexW(nil, true, ptr) 
+            }
+        }
+
+        guard let handle else {
+            throw Error(code: .init(GetLastError()), message: "Failed to create mutex")
+        }
+
+        return try await execute {
+
+            var warned = false
+            let startTime = Date.now
+
+            waitLoop: while true {
+
+                try Task.checkCancellation()
+
+                if !warned && Date.now.timeIntervalSince(startTime) > 30 {
+                    printFromStart("""
+                        Warning: waiting for lock for more than 30 seconds
+                        
+                        It might be caused by one of the following reasons:
+                        1. another swift-script process is still running 
+                        2. the lock file is not cleaned up properly
+                        
+                        You can keep waiting or stop the current process by pressing Ctrl+C
+                        If you want to kill the process that is currently holding the lock, you can \
+                        find its PID in the file at \(path)
+                        """.yellow
+                    )
+                    warned = true
+                }
+
+                let result = await Task.launch(on: .io) {
+                    WaitForSingleObject(handle, 1000)
+                }
+
+                switch result {
+                    case WAIT_OBJECT_0: break waitLoop
+                    case .init(WAIT_TIMEOUT), WAIT_ABANDONED: continue
+                    default: throw Error(code: .init(GetLastError()), message: "Failed to acquire lock")
+                }
+
+            }
+
+            try await storeProcessLockPid()
+
+            return try await execute {
+                try await operation()
+            } finally: {
+                await Task.launch(on: .io) { _ = ReleaseMutex(handle) } 
+                await self.removePidFile()
+            }
+
+        } finally: {
+            await Task.launch(on: .io) { _ = CloseHandle(handle) }
+        }
+
+    }
+
+
+    private func storeProcessLockPid() async throws {
+
+        let pid = ProcessInfo.processInfo.processIdentifier
+        try await FileManager.default.write(.init(pid.description.utf8), to: .init(path), replaceExisting: true)
+
+    }
+
+
+    private func removePidFile() async {
+        try? await FileManager.default.removeItem(at: .init(path))
+    }
+
+#endif
+
 }
+
+
+#if os(Windows)
+private let WAIT_ABANDONED: DWORD = 0x00000080
+#endif
 
 
 extension ProcessLock {
@@ -86,7 +178,7 @@ extension ProcessLock {
     struct Error: LocalizedError {
         let code: Int32
         let message: String
-        var errorDescription: String? { "File Lock Error (\(code)) - \(message)" }
+        var errorDescription: String? { "Process Lock Error (\(code)) - \(message)" }
     }
 
 }
