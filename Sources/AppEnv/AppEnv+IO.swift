@@ -5,67 +5,6 @@ import Foundation
 
 extension AppEnv {
 
-    private struct AppConfigCodingStructure: Codable {
-        var swiftVersion: String?
-#if os(macOS)
-        var macosVersion: String?
-#endif
-    }
-
-    func loadAppConfig() async throws -> AppConfig {
-
-        try Task.checkCancellation()
-
-        let structure = try await JSONDecoder().decode(
-            AppConfigCodingStructure.self,
-            from: .read(contentAt: configFilePath)
-        )
-#if os(macOS)
-        try Task.checkCancellation()
-        let macosVersion = if let str = structure.macosVersion {
-            Version(string: str) ?? fetchMacosVersion()
-        } else {
-            fetchMacosVersion()
-        }
-#endif
-        try Task.checkCancellation()
-        let swiftVersion = if let str = structure.swiftVersion {
-            try await Version(string: str).unwrap(or: { try await fetchSwiftVersion() })
-        } else {
-            try await fetchSwiftVersion()
-        }
-
-#if os(macOS)
-        return .init(
-            macosVersion: macosVersion,
-            swiftVersion: swiftVersion
-        )
-#else
-        return .init(
-            swiftVersion: swiftVersion
-        )
-#endif
-
-    }
-
-    func saveAppConfig(_ config: AppConfig) async throws {
-
-        try Task.checkCancellation()
-
-#if os(macOS)
-        let structure = AppConfigCodingStructure(
-            swiftVersion: config.swiftVersion.description,
-            macosVersion: config.macosVersion.description
-        )
-#else
-        let structure = AppConfigCodingStructure(
-            swiftVersion: config.swiftVersion.description
-        )
-#endif
-        try await JSONEncoder().encode(structure).write(to: configFilePath)
-
-    }
-
     func loadInstalledPackages() async throws -> [InstalledPackage] {
         try Task.checkCancellation()
         return try await JSONDecoder().decode(
@@ -101,14 +40,17 @@ extension AppEnv {
 
 extension AppEnv {
 
-    func updatePackageManifest(
-        installedPackages: [InstalledPackage],
-        config: AppConfig
-    ) async throws {
+    func updatePackageManifest(installedPackages: [InstalledPackage]) async throws {
         try Task.checkCancellation()
+        let swiftVersion = if let version = appConfig.swiftVersion {
+            version
+        } else {
+            try await fetchSwiftVersion()
+        }
         let manifest = PackageManifestTemplate.makeRunnerPackageManifest(
             installedPackages: installedPackages,
-            config: config
+            swiftVersion: swiftVersion,
+            macosVersion: appConfig.macosVersion ?? fetchMacosVersion()
         )
         try await Data(manifest.utf8).write(to: runnerPackageManifestPath)
     }
@@ -158,14 +100,14 @@ extension AppEnv {
         
         try Task.checkCancellation()
 
-        let items = items.isEmpty ? [\.config, \.packageManifest, \.installedPackages] : items
+        let items = (items.isEmpty ? [\.config, \.packageManifest, \.installedPackages] : items).toSet()
 
         var cache = OriginalCache()
 
         for item in items {
             switch item {
                 case \.config:
-                    cache.config = try await loadAppConfig()
+                    cache.config = appConfig
                 case \.packageManifest:
                     cache.packageManifest = try await loadPackageManifes()
                 case \.installedPackages:

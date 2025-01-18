@@ -1,5 +1,5 @@
 //
-//  VerboseLoggableCommand.swift
+//  SwiftScriptWrappedCommand.swift
 //  swift-script
 //
 //  Created by Star_Lord_PHB on 2024/11/3.
@@ -14,7 +14,7 @@ nonisolated(unsafe) private var interruptCleanUpOperations: [@MainActor () async
 nonisolated(unsafe) private var normalCleanUpOperations: [@MainActor () async -> Void] = []
 
 
-protocol VerboseLoggableCommand: AsyncParsableCommand {
+protocol SwiftScriptWrappedCommand: AsyncParsableCommand {
     var appEnv: AppEnv { get set }
     var verbose: Bool { get }
     var logger: Logger { get }
@@ -22,7 +22,7 @@ protocol VerboseLoggableCommand: AsyncParsableCommand {
 }
 
 
-extension VerboseLoggableCommand {
+extension SwiftScriptWrappedCommand {
     
     var verbose: Bool { false }
     var logger: Logger { .init() }
@@ -39,6 +39,7 @@ extension VerboseLoggableCommand {
 
             SignalHandler.startSignalListening()
 
+            try await appEnv.initialize()
             logger.initialize(verbose: verbose)
 
             let localSelf = SendableWrapper(value: self)

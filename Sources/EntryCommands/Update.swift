@@ -10,7 +10,7 @@ import FoundationPlus
 import SwiftCommand
 
 
-struct SwiftScriptUpdate: VerboseLoggableCommand {
+struct SwiftScriptUpdate: SwiftScriptWrappedCommand {
     
     static let configuration: CommandConfiguration = .init(commandName: "update")
     
@@ -75,15 +75,12 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
             
             try await appEnv.withProcessLock {
 
-                logger.printDebug("Loading configuration")
-                let config = try await appEnv.loadAppConfig()
-
                 logger.printDebug("Loading installed packages and package manifest")
                 let original = try await appEnv.cacheOriginals(\.installedPackages, \.packageManifest)
 
                 let originalPackages = original.installedPackages!
                 
-                let updatedPackages = try await updatePackages(originalPackages, config: config)
+                let updatedPackages = try await updatePackages(originalPackages)
                 
                 let modifiedPackages = zip(originalPackages, updatedPackages).filter {
                     $0.requirement != $1.requirement
@@ -121,7 +118,7 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
                 print("Saving updated installed packages")
                 try await appEnv.saveInstalledPackages(updatedPackages)
                 print("Saving updated runner package manifest")
-                try await appEnv.updatePackageManifest(installedPackages: updatedPackages, config: config)
+                try await appEnv.updatePackageManifest(installedPackages: updatedPackages)
                 
                 if noBuild {
                     print("Resolving (will not build since `--no-build` is set)")
@@ -140,10 +137,7 @@ struct SwiftScriptUpdate: VerboseLoggableCommand {
     }
     
     
-    private func updatePackages(
-        _ originalPackages: [InstalledPackage],
-        config: AppConfig
-    ) async throws -> [InstalledPackage] {
+    private func updatePackages(_ originalPackages: [InstalledPackage]) async throws -> [InstalledPackage] {
         
         try await originalPackages.enumerated().async
             .map { i, package in

@@ -10,7 +10,7 @@ import FoundationPlus
 import SwiftCommand
 
 
-struct SwiftScriptSearch: VerboseLoggableCommand {
+struct SwiftScriptSearch: SwiftScriptWrappedCommand {
     
     static let configuration: CommandConfiguration = .init(commandName: "search", shouldDisplay: false)
 

@@ -10,7 +10,7 @@ import FoundationPlus
 import SwiftCommand
 
 
-struct SwiftScriptUninstall: VerboseLoggableCommand {
+struct SwiftScriptUninstall: SwiftScriptWrappedCommand {
     
     static let configuration: CommandConfiguration = .init(
         commandName: "uninstall",
@@ -55,9 +55,6 @@ struct SwiftScriptUninstall: VerboseLoggableCommand {
                 )
             }
             
-            logger.printDebug("Loading configuration")
-            let config = try await appEnv.loadAppConfig()
-            
             print("Removing \(identities.joined(separator: ", "))")
             
             registerCleanUp {
@@ -68,7 +65,7 @@ struct SwiftScriptUninstall: VerboseLoggableCommand {
             print("Saving updated installed packages")
             try await appEnv.saveInstalledPackages(updatedPackages)
             print("Saving updated runner package manifest")
-            try await appEnv.updatePackageManifest(installedPackages: updatedPackages, config: config)
+            try await appEnv.updatePackageManifest(installedPackages: updatedPackages)
             
             if noBuild {
                 print("Resolving (will not build since `--no-build` is set)")

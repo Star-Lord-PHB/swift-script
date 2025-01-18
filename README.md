@@ -229,16 +229,18 @@ Read / Modify configuration of the `SwiftCommand`.
 
 To modify config, use the format
 ```sh
-SwiftScript config set --config_name1=value1 --config_name2=value2 ...
+SwiftScript config set --config_name1=value1 --config_name2=value2 --clear_config_name1 --clear_config_name2 ...
 ```
 
 Currently `SwiftScript` supports the following configs: 
 * `swift_version`: the version of swift for executing the script
 * `macos_version`: the max macOS sdk for executing the script (this option is only valid on macOS)
+* `swift_path`: The path to the `swift` executable
 
 Examples: 
 ```sh
 SwiftScript config swift_version
-SwiftScript config set swift_version=6.0.0
-SwiftScript config set swift_version=6.0.2 macos_version=15.1
+SwiftScript config set --swift_version=6.0.0
+SwiftScript config set --swift_version=6.0.2 --macos_version=15.1 --swift_path="/usr/bin/swift"
+SwiftScript config set --swift_version=6.0.2 --clear_macos_version --swift_path="/usr/bin/swift"
 ```

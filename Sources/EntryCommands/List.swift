@@ -10,7 +10,7 @@ import FoundationPlus
 import SwiftCommand
 
 
-struct SwiftScriptList: VerboseLoggableCommand {
+struct SwiftScriptList: SwiftScriptWrappedCommand {
     
     static let configuration: CommandConfiguration = .init(commandName: "list")
 

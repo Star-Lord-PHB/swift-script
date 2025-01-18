@@ -20,9 +20,7 @@ mkdir exec
 setlocal enabledelayedexpansion
 (
     echo {
-    echo     "swiftVersion": "6.0",
-    echo     "macosVersion": "15",
-    echo     "strictConcurrency": false
+    echo     "swiftVersion": "6.0"
     echo }
 ) > config.json
 endlocal

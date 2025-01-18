@@ -12,29 +12,21 @@ import SwiftCommand
 
 enum PackageManifestTemplate {
 
-    private static func platformStr(from config: AppConfig) -> String {
-    #if os(macOS)
-            return #"platforms: [.macOS("\#(config.macosVersion)")],"#
-    #else
-            return ""
-    #endif
-    }
-
-
     static func makeRunnerPackageManifest(
         installedPackages: [InstalledPackage],
-        config: AppConfig
+        swiftVersion: Version,
+        macosVersion: Version? = nil 
     ) -> String {
         
         #"""
-        // swift-tools-version: \#(config.swiftVersion)
+        // swift-tools-version: \#(swiftVersion)
         // The swift-tools-version declares the minimum version of Swift required to build this package.
         
         import PackageDescription
         
         let package = Package(
             name: "swift-script-runner",
-            \#(platformStr(from: config))
+            \#(macosVersion.map { #"platforms: [.macOS("\#($0)")],"# } ?? "")
             dependencies: [
                 \#(installedPackages.map(\.dependencyCommand).joined(separator: ","))
             ],
@@ -67,7 +59,8 @@ enum PackageManifestTemplate {
     static func makeTempPackageManifest(
         packageUrl: URL,
         requirement: InstalledPackage.Requirement,
-        config: AppConfig
+        swiftVersion: Version,
+        macosVersion: Version? = nil 
     ) -> String {
         let package = InstalledPackage(
             identity: "",
@@ -76,14 +69,14 @@ enum PackageManifestTemplate {
             requirement: requirement
         )
         return #"""
-            // swift-tools-version: \#(config.swiftVersion)
+            // swift-tools-version: \#(swiftVersion)
             // The swift-tools-version declares the minimum version of Swift required to build this package.
             
             import PackageDescription
             
             let package = Package(
                 name: "temp",
-                platforms: [\#(platformStr(from: config))],
+                \#(macosVersion.map { #"platforms: [.macOS("\#($0)")],"# } ?? "")
                 dependencies: [
                     \#(package.dependencyCommand)
                 ],

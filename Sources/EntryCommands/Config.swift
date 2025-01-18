@@ -1,8 +1,9 @@
 import Foundation
 import ArgumentParser
+import SystemPackage
 
 
-struct SwiftScriptConfig: VerboseLoggableCommand {
+struct SwiftScriptConfig: SwiftScriptWrappedCommand {
 
     static let configuration: CommandConfiguration = .init(
         commandName: "config",
@@ -13,18 +14,20 @@ struct SwiftScriptConfig: VerboseLoggableCommand {
 
 
     func wrappedRun() async throws {
-        let config = try await appEnv.loadAppConfig()
+        let config = appEnv.appConfig
 #if os(macOS)
         print(
             """
-            swift tools version: \(config.swiftVersion)
-            macOS min support version: \(config.macosVersion)
+            swift path: \(config.swiftFilePath ?? "(not specified)")
+            swift tools version: \(config.swiftVersion?.description ?? "(not specified)")
+            macOS min support version: \(config.macosVersion?.description ?? "(not specified)")
             """
         )
 #else
         print(
             """
-            swift tools version: \(config.swiftVersion)
+            swift path: \(config.swiftFilePath ?? "(not specified)")
+            swift tools version: \(config.swiftVersion?.description ?? "(not specified)")
             """
         )
 #endif
@@ -33,14 +36,27 @@ struct SwiftScriptConfig: VerboseLoggableCommand {
 }
 
 
-struct SwiftScriptConfigSet: VerboseLoggableCommand {
+
+struct SwiftScriptConfigSet: SwiftScriptWrappedCommand {
 
     static let configuration: CommandConfiguration = .init(commandName: "set")
 
     @Option(transform: Version.parse(_:))
     var swiftVersion: Version?
 
+    @Option(transform: FilePath.init(_:))
+    var swiftPath: FilePath?
+
+    @Flag 
+    var clearSwiftPath: Bool = false
+
+    @Flag
+    var clearSwiftVersion: Bool = false
+
 #if os(macOS)
+    @Flag
+    var clearMacosVersion: Bool = false
+
     @Option(transform: Version.parse(_:))
     var macosVersion: Version?
 #endif
@@ -55,19 +71,24 @@ struct SwiftScriptConfigSet: VerboseLoggableCommand {
     var logger: Logger = .init()
 
 
-    func wrappedRun() async throws {
-
+    func validate() throws {
+        
 #if os(macOS)
-        guard swiftVersion != nil || macosVersion != nil else {
+        guard swiftVersion != nil || macosVersion != nil || swiftPath != nil || clearSwiftPath || clearSwiftVersion || clearMacosVersion else {
             logger.printWarning("No config update specified")
             throw ExitCode.success
         }
 #else
-        guard swiftVersion != nil else {
+        guard swiftVersion != nil || swiftPath != nil || clearSwiftPath || clearSwiftVersion else {
             logger.printWarning("No config update specified")
             throw ExitCode.success
         }
 #endif
+
+    }
+
+
+    func wrappedRun() async throws {
 
         logger.printDebug("Loading original configuration and package manifest ...")
         let original = try await appEnv.cacheOriginals(\.config, \.packageManifest)
@@ -75,16 +96,30 @@ struct SwiftScriptConfigSet: VerboseLoggableCommand {
         logger.printDebug("Loading installed packages ...")
         let installedPackages = try await appEnv.loadInstalledPackages()
 
-        var config = original.config!
+        var config = appEnv.appConfig
 
-        if let swiftVersion = swiftVersion {
-            logger.printDebug("Changing swift tools version from \(config.swiftVersion) to \(swiftVersion)")
+        if let swiftVersion {
+            logger.printDebug("Changing swift tools version from \(config.swiftVersion?.description ?? "(not specified)") to \(swiftVersion)")
             config.swiftVersion = swiftVersion
+        } else if clearSwiftVersion {
+            logger.printDebug("Clearing swift tools version")
+            config.swiftVersion = nil
+        }
+        if let swiftPath {
+            let pathStr = swiftPath.components.isEmpty ? nil : swiftPath.string
+            logger.printDebug("Changing swift path from \(config.swiftPath ?? "(not specified)") to \(pathStr ?? "(not specified)")")
+            config.swiftPath = pathStr
+        } else if clearSwiftPath {
+            logger.printDebug("Clearing swift path")
+            config.swiftPath = nil
         }
 #if os(macOS)
-        if let macosVersion = macosVersion {
-            logger.printDebug("Changing macOS min support version from \(config.macosVersion) to \(macosVersion)")
+        if let macosVersion {
+            logger.printDebug("Changing macOS min support version from \(config.macosVersion?.description ?? "(not specified)") to \(macosVersion)")
             config.macosVersion = macosVersion
+        } else if clearMacosVersion {
+            logger.printDebug("Clearing macOS min support version")
+            config.macosVersion = nil
         }
 #endif // os(macOS)
 
@@ -97,7 +132,7 @@ struct SwiftScriptConfigSet: VerboseLoggableCommand {
         try await appEnv.saveAppConfig(config)
 
         logger.printDebug("Updating runner package manifest")
-        try await appEnv.updatePackageManifest(installedPackages: installedPackages, config: config)
+        try await appEnv.updatePackageManifest(installedPackages: installedPackages)
 
         if !noBuild {
             print("Full Re-Building...")

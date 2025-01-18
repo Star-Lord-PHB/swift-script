@@ -10,7 +10,7 @@ import FoundationPlus
 import SwiftCommand
 
 
-struct SwiftScriptInstall: VerboseLoggableCommand {
+struct SwiftScriptInstall: SwiftScriptWrappedCommand {
     
     static let configuration: CommandConfiguration = .init(commandName: "install")
     
@@ -64,9 +64,6 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
             let original = try await appEnv.cacheOriginals(\.installedPackages, \.packageManifest)
         
             var installedPackages = original.installedPackages!
-
-            logger.printDebug("Loading configuration")
-            let config = try await appEnv.loadAppConfig()
             
             logger.printDebug("Checking whether package is already installed")
             if let conflictPackageIndex = installedPackages
@@ -121,7 +118,7 @@ struct SwiftScriptInstall: VerboseLoggableCommand {
             print("Saving updated installed packages")
             try await appEnv.saveInstalledPackages(installedPackages)
             print("Saving updating runner package manifest")
-            try await appEnv.updatePackageManifest(installedPackages: installedPackages, config: config)
+            try await appEnv.updatePackageManifest(installedPackages: installedPackages)
             
             if noBuild {
                 print("Resolving (will not build since `--no-build` is set)")

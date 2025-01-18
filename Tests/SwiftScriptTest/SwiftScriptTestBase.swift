@@ -76,6 +76,8 @@ extension SwiftScriptTestBase {
 
         try #require(output.status.terminatedSuccessfully == true)
 
+        try await appEnv.initialize()
+
     }
 
 }

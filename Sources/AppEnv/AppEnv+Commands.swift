@@ -9,13 +9,22 @@ import FoundationNetworking
 
 extension AppEnv {
 
+    func requireSwiftCommand() async throws -> Command<UnspecifiedInputSource, UnspecifiedOutputDestination, UnspecifiedOutputDestination> {
+        try appConfig.swiftFilePath.map { .init(executablePath: $0) } ?? .requireInPath("swift")
+    }
+
+}
+
+
+extension AppEnv {
+
     func resolveRunnerPackage(verbose: Bool = false) async throws {
         try await resolvePackage(at: runnerPackagePath, verbose: verbose)
     }
 
 
     func cleanRunnerPackage() async throws {
-        try await Command.requireInPath("swift")
+        try await requireSwiftCommand()
             .setCWD(runnerPackagePath)
             .addArguments("package", "clean")
             .wait()
@@ -26,7 +35,7 @@ extension AppEnv {
         arguments: [String] = [],
         verbose: Bool = false
     ) async throws {
-        try await Command.requireInPath("swift")
+        try await requireSwiftCommand()
             .addArguments(
                 "build",
                 "--package-path", runnerPackagePath.string,
@@ -156,7 +165,7 @@ extension AppEnv {
 
 
     func printRunnerDependencies() async throws {
-        try await Command.requireInPath("swift")
+        try await requireSwiftCommand()
             .addArguments(
                 "package", "show-dependencies",
                 "--package-path", runnerPackagePath.string
@@ -171,7 +180,7 @@ extension AppEnv {
 
         try Task.checkCancellation()
 
-        let data = try await Command.requireInPath("swift")
+        let data = try await requireSwiftCommand()
             .setCWD(packagePath)
             .addArguments("package", "show-dependencies")
             .getOutputWithFile(at: tempDirPath.appending(UUID().uuidString))
@@ -186,7 +195,7 @@ extension AppEnv {
         as type: T.Type = T.self
     ) async throws -> T {
 
-        let data = try await Command.requireInPath("swift")
+        let data = try await requireSwiftCommand()
             .setCWD(packagePath)
             .addArguments("package", "describe", "--type", "json")
             .getOutputWithFile(at: tempDirPath.appending(UUID().uuidString))
@@ -200,7 +209,7 @@ extension AppEnv {
         try await withTempFolder { folderPath in
             try await createNewPackage(at: folderPath)
             try Task.checkCancellation()
-            let versionStr = try await Command.requireInPath("swift")
+            let versionStr = try await requireSwiftCommand()
                 .setCWD(folderPath)
                 .addArguments("package", "tools-version")
                 .getOutput().stdout
@@ -265,7 +274,7 @@ extension AppEnv {
 
 
     func createNewPackage(at path: FilePath) async throws {
-        try await Command.requireInPath("swift")
+        try await requireSwiftCommand()
             .setCWD(path)
             .addArguments("package", "init")
             .wait(printingOutput: false)
@@ -273,7 +282,7 @@ extension AppEnv {
 
 
     func resolvePackage(at path: FilePath, verbose: Bool = false) async throws {
-        try await Command.requireInPath("swift")
+        try await requireSwiftCommand()
             .addArguments(
                 "package", "resolve",
                 "--package-path", path.string

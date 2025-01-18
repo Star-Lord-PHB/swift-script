@@ -19,8 +19,7 @@ mkdir "exec"
 configContent="
 {
     \"swiftVersion\": \"6.0\",
-    \"macosVersion\": \"15\",
-    \"strictConcurrency\": false 
+    \"macosVersion\": \"15\"
 }
 "
 echo "$configContent" > config.json

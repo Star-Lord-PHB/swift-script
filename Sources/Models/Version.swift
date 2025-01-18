@@ -1,7 +1,7 @@
 import FoundationPlusEssential
 
 
-struct Version {
+struct Version: Sendable {
     let major: Int
     let minor: Int
     let patch: Int

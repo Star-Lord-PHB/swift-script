@@ -2,20 +2,47 @@ import Foundation
 import FileManagerPlus
 
 
-final class AppEnv: Sendable {
+final class AppEnv: @unchecked Sendable {
 
     let appBasePath: FilePath 
     let processLock: ProcessLock
+    private var _appConfig: AppConfig? = nil 
+    private let lock: NSLock = .init()
+
+    private(set) var appConfig: AppConfig {
+        get { 
+            guard let config = _appConfig else {
+                fatalError("AppEnv is not initialized")
+            }
+            return config
+        }
+        set { _appConfig = newValue }
+    }
+
 
     init(base: FilePath = defaultBasePath) {
         self.appBasePath = base
         self.processLock = .init(path: appBasePath.appending("lock.lock"))
     }
 
+
+    @discardableResult
+    func initialize() async throws -> Self {
+        guard _appConfig == nil else { return self }
+        let appConfig = try await JSONDecoder()
+            .decode(AppConfig.self, from: .read(contentAt: configFilePath))
+        lock.withLock {
+            guard _appConfig == nil else { return }
+            _appConfig = appConfig
+        }
+        return self
+    }
+
+
     static let defaultBasePath: FilePath = FileManager.default.homeDirectoryFilePathForCurrentUser
         .appending(".swift-script")
 
-    static let `default` = AppEnv()
+    static let `default`: AppEnv = .init()
 
 }
 
@@ -24,6 +51,16 @@ extension AppEnv {
 
     func withProcessLock<R>(_ operation: () async throws -> R) async throws -> R {
         try await processLock.withLock(operation)
+    }
+
+
+    func saveAppConfig(_ config: AppConfig) async throws {
+
+        try Task.checkCancellation()
+
+        try await JSONEncoder().encode(config).write(to: configFilePath)
+        self.appConfig = config
+
     }
 
 }
