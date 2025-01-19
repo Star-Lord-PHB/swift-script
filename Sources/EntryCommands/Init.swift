@@ -144,13 +144,13 @@ struct SwiftScriptInit: SwiftScriptWrappedCommand {
         }
 
         let cachePath = appEnv.swiftScriptBinaryPath.removingLastComponent()
-            .appending((appEnv.swiftScriptBinaryPath.lastComponent?.string ?? "") + "-\(Date().formatted(.iso8601))")
+            .appending((appEnv.swiftScriptBinaryPath.lastComponent?.string ?? "") + "-\(ISO8601DateFormatter().string(from: Date()))")
 
         try await manager.moveItem(at: appEnv.swiftScriptBinaryPath, to: cachePath)
 
         registerCleanUp(when: .interrupt) {
             do {
-                try await manager.moveItem(at: cachePath, to: appEnv.swiftScriptBinaryPath)
+                try await FileManager.default.moveItem(at: cachePath, to: appEnv.swiftScriptBinaryPath)
             } catch {
                 logger.printWarning("Failed to restore the original binary at \(appEnv.swiftScriptBinaryPath): \(error)")
                 logger.printWarning("Please restore it manually.")
@@ -210,13 +210,13 @@ struct SwiftScriptInit: SwiftScriptWrappedCommand {
 
         let originalAppBasePath = appEnv.appBasePath
         let cachePath = appEnv.appBasePath.removingLastComponent()
-            .appending((appEnv.appBasePath.lastComponent?.string ?? "") + "-\(Date().formatted(.iso8601))")
+            .appending((appEnv.appBasePath.lastComponent?.string ?? "") + "-\(ISO8601DateFormatter().string(from: Date()))")
 
         try await manager.moveItem(at: appEnv.appBasePath, to: cachePath)
 
         registerCleanUp(when: .normalExit) { [logger] in
             do {
-                try await manager.removeItem(at: cachePath)
+                try await FileManager.default.removeItem(at: cachePath)
             } catch {
                 logger.printWarning("Failed to remove the temporary cache directory at \(cachePath): \(error)")
                 logger.printWarning("Please remove it manually.")
@@ -224,7 +224,7 @@ struct SwiftScriptInit: SwiftScriptWrappedCommand {
         }
         registerCleanUp(when: .interrupt) { [logger] in
             do {
-                try await manager.moveItem(at: cachePath, to: originalAppBasePath)
+                try await FileManager.default.moveItem(at: cachePath, to: originalAppBasePath)
             } catch {
                 logger.printWarning("Failed to restore the original installation at \(originalAppBasePath): \(error)")
                 logger.printWarning("Please restore it manually.")
