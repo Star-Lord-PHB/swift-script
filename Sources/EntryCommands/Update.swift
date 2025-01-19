@@ -35,7 +35,7 @@ struct SwiftScriptUpdate: SwiftScriptWrappedCommand {
     @Flag(help: "If set, will not build the package after installation (NOT RECOMMENDED! Aimed only for faster testing)")
     var noBuild: Bool = false
 
-    var appEnv: AppEnv = .default
+    var appEnv: AppEnv = .fromEnv()
     var logger: Logger = .init()
     
     

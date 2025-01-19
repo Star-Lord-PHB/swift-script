@@ -28,6 +28,12 @@ extension AppEnv {
 
     var execPath: FilePath { appBasePath.appending("exec") }
 
+    var binFolderPath: FilePath { appBasePath.appending("bin") }
+
+    var swiftScriptBinaryPath: FilePath { binFolderPath.appending("swiftscript") }
+
+    var envScriptPath: FilePath { appBasePath.appending("env.sh") }
+
     var executableProductPath: FilePath {
         runnerPackagePath.appending(".build/release/Runner")
     }

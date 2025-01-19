@@ -9,10 +9,10 @@ The project is still under construction and only support very basic features.
 Currently known limitations: 
 - [ ] [Swift Package Index](https://swiftpackageindex.com) still does not have APIs available, currently using their [package list repository](https://github.com/SwiftPackageIndex/PackageList/blob/main/packages.json) 
 - [x] ~~Does not support complex semetic version format other than the basic `major.minor.patch` format yet. In other word, formats such as `v1.0.0`, `1.0.0-alpha` are not currently supported~~
-- [ ] No formal installation script yet
+- [x] ~~No formal installation script yet~~
 - [x] ~~Not tested on Linux yet~~
-- [ ] Not tested on Windows yet
-- [ ] Does not support customized swift location yet
+- [ ] Not tested on Windows yet (swift-testing for executable target on Windows is kind of broken?)
+- [x] ~~Does not support customized swift location yet~~
 - [ ] Does not support module alias yet 
 - [ ] No idea how to support code completion yet
 - [ ] The `--help` output and docs are not completed yet
@@ -91,6 +91,7 @@ To make things easier, there is a script provided in the `manual_test_scripts` f
 * info 
 * update
 * config
+* init
 
 When run with no subcommands specified, the `run` subcommand will be automatically used. 
 
@@ -244,3 +245,32 @@ SwiftScript config set --swift_version=6.0.0
 SwiftScript config set --swift_version=6.0.2 --macos_version=15.1 --swift_path="/usr/bin/swift"
 SwiftScript config set --swift_version=6.0.2 --clear_macos_version --swift_path="/usr/bin/swift"
 ```
+
+#### Init Command
+
+```sh
+swiftscript init
+```
+
+Command that will automatically install itself and prepare the environment. 
+
+If run directly without any other options, it will prompt for several settings for custom installation. Those customization settings can also be provided with the following options directly, then the command will not prompt for input for that setting.
+* `--install-path`: Path to install SwiftScript
+* `--swift-path`: Path to swift executable
+* `--swift-version`: The Swift version to use for building and running script
+
+To install without any interactive prompt, provide values for all the necessary customization options or simply use `--quiet` (`-q`) flag, which will fill all un-specified settings with default values. 
+
+By default, the installation will setup the environment by modifying `.profile` or `.zprofile`. If that is not intended, pass in `--no-env` flag. 
+
+This command is also capable of re-installing SwiftScript. When it detects that SwiftScript is already installed, it prompt for re-installation options, which can be: 
+* **re-install binary only:** only replace the binary, everything else will stay the same
+* **fully re-install:** fully remove everything and re-install
+
+Choosing between these 2 re-installation type can also be done by passing flags: 
+* `--reinstall-binary`: re-install binary only
+* `--fully-reinstall`: fully re-install
+
+Note that if `--quiet` is set and SwiftScript is already install and `--reinstall-binary` is not set, it will do a full re-install without any prompt. 
+
+Uninstall is also done with this command, by passing the `--uninstall` flag. It will remove every files and folders used by SwiftScript, but will not remove the environment configuration in `.profile` or `.zprofile`, which need to be done manually. 

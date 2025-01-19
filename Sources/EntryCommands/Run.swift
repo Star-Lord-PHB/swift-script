@@ -33,7 +33,7 @@ struct SwiftScriptRun: SwiftScriptWrappedCommand {
     @Argument(parsing: .captureForPassthrough, help: "Pass arguments through to the script")
     var arguments: [String] = []
 
-    var appEnv: AppEnv = .default
+    var appEnv: AppEnv = .fromEnv()
     var logger: Logger = .init()
 
     

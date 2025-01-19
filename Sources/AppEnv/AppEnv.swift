@@ -42,7 +42,15 @@ final class AppEnv: @unchecked Sendable {
     static let defaultBasePath: FilePath = FileManager.default.homeDirectoryFilePathForCurrentUser
         .appending(".swift-script")
 
+    static let basePathEnvKey: String = "SWIFT_SCRIPT_HOME"
+
     static let `default`: AppEnv = .init()
+    static func fromEnv(default: AppEnv = .default) -> AppEnv {
+        guard let path = ProcessInfo.processInfo.environment[basePathEnvKey] else {
+            return `default`
+        }
+        return .init(base: FilePath(path))
+    }
 
 }
 

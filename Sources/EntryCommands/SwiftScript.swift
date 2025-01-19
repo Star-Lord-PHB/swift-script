@@ -21,6 +21,7 @@ struct SwiftScript: AsyncParsableCommand {
             SwiftScriptUpdate.self,
             SwiftScriptSearch.self,
             SwiftScriptConfig.self,
+            SwiftScriptInit.self,
         ],
         defaultSubcommand: SwiftScriptRun.self
     )

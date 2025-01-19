@@ -14,7 +14,7 @@ struct SwiftScriptList: SwiftScriptWrappedCommand {
     
     static let configuration: CommandConfiguration = .init(commandName: "list")
 
-    var appEnv: AppEnv = .default
+    var appEnv: AppEnv = .fromEnv()
     
 
     func wrappedRun() async throws {

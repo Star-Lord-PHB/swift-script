@@ -12,7 +12,7 @@ extension Version {
     
     init?(string: String) {
         let components = string.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ".")
-        guard components.count <= 3 else { return nil }
+        guard components.count <= 3 && components.count > 0 else { return nil }
         let intComponents = components.map { Int($0) } + [Int](repeating: 0, count: max(0, 3 - components.count))
         guard intComponents.allSatisfy({ $0 != nil }) else { return nil }
         self.major = intComponents[0]!

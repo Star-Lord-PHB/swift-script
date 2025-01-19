@@ -26,7 +26,7 @@ struct SwiftScriptSearch: SwiftScriptWrappedCommand {
     @Flag(name: .long)
     var verbose: Bool = false
 
-    var appEnv: AppEnv = .default
+    var appEnv: AppEnv = .fromEnv()
     var logger: Logger = .init()
 
 

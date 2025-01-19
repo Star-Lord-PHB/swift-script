@@ -18,6 +18,7 @@ protocol SwiftScriptWrappedCommand: AsyncParsableCommand {
     var appEnv: AppEnv { get set }
     var verbose: Bool { get }
     var logger: Logger { get }
+    var noInitAppEnv: Bool { get }
     mutating func wrappedRun() async throws
 }
 
@@ -26,6 +27,7 @@ extension SwiftScriptWrappedCommand {
     
     var verbose: Bool { false }
     var logger: Logger { .init() }
+    var noInitAppEnv: Bool { false }
 
     init(appEnv: AppEnv) {
         self.init()
@@ -39,7 +41,9 @@ extension SwiftScriptWrappedCommand {
 
             SignalHandler.startSignalListening()
 
-            try await appEnv.initialize()
+            if !noInitAppEnv {
+                try await appEnv.initialize()
+            }
             logger.initialize(verbose: verbose)
 
             let localSelf = SendableWrapper(value: self)
