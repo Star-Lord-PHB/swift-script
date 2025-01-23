@@ -143,9 +143,6 @@ struct SwiftScriptInit: SwiftScriptWrappedCommand {
             throw CLIError(reason: "Cannot determine binary path.")
         }
 
-        let cachePath = appEnv.swiftScriptBinaryPath.removingLastComponent()
-            .appending((appEnv.swiftScriptBinaryPath.lastComponent?.string ?? "") + "-\(ISO8601DateFormatter().string(from: Date()))")
-
         try await manager.moveItem(at: appEnv.swiftScriptBinaryPath, to: cachePath)
 
         registerCleanUp(when: .interrupt) {
@@ -183,6 +180,7 @@ struct SwiftScriptInit: SwiftScriptWrappedCommand {
         }
 
         try await makeNecessaryFilesAndFolders(config: config)
+        try await appEnv.initialize()
         try await createRunnerPackage(swiftPath: swiftPath.map { .init($0) })
 
         guard let currentBinaryPath = try Bundle.main.executableURL?.assertAsFilePath() else {
@@ -193,12 +191,15 @@ struct SwiftScriptInit: SwiftScriptWrappedCommand {
         if !noEnv {
             try await addToEnv()
             print("Installation complete. Please re-login to have the environment available.")
+#if canImport(Glibc) || canImport(Darwin)
             print("Alternatively, you can run the following command to activate the environment immediately for current shell:")
             print(". \(appEnv.envScriptPath)")
+#endif
+
         } else {
             print("Installation complete.")
             print("Because --no-env is set, the environment is not currently available.")
-            print("The env setup script is located at \(appEnv.envScriptPath) and the binary is located at \(appEnv.swiftScriptBinaryPath), please do the setup manually.")
+            print("The env setup script is located at \(appEnv.envScriptPath), please do the setup manually.")
         }
 
     }
@@ -209,12 +210,12 @@ struct SwiftScriptInit: SwiftScriptWrappedCommand {
         let manager = FileManager.default
 
         let originalAppBasePath = appEnv.appBasePath
-        let cachePath = appEnv.appBasePath.removingLastComponent()
-            .appending((appEnv.appBasePath.lastComponent?.string ?? "") + "-\(ISO8601DateFormatter().string(from: Date()))")
+        // let cachePath = appEnv.appBasePath.removingLastComponent()
+        //     .appending((appEnv.appBasePath.lastComponent?.string ?? "") + "-\(ISO8601DateFormatter().string(from: Date()))")
 
         try await manager.moveItem(at: appEnv.appBasePath, to: cachePath)
 
-        registerCleanUp(when: .normalExit) { [logger] in
+        registerCleanUp(when: .normalExit) { [logger, cachePath] in
             do {
                 try await FileManager.default.removeItem(at: cachePath)
             } catch {
@@ -222,7 +223,7 @@ struct SwiftScriptInit: SwiftScriptWrappedCommand {
                 logger.printWarning("Please remove it manually.")
             }
         }
-        registerCleanUp(when: .interrupt) { [logger] in
+        registerCleanUp(when: .interrupt) { [logger, cachePath] in
             do {
                 try await FileManager.default.moveItem(at: cachePath, to: originalAppBasePath)
             } catch {
@@ -242,10 +243,11 @@ struct SwiftScriptInit: SwiftScriptWrappedCommand {
         let response = readLine()?.trimmingCharacters(in: .whitespaces).lowercased()
         guard response == "y" || response == "yes" else { return }
 
-        try await FileManager.default.removeItem(at: appEnv.appBasePath)
+        try await removeFromEnv()
 
-        print("Uninstallation complete.")
 #if canImport(Glibc) || canImport(Darwin)
+        try await FileManager.default.removeItem(at: appEnv.appBasePath)
+        print("Uninstallation complete.")
         if let shellConfigPath = try? currentShellConfigPath() {
             print("The environment settings in your shell configuration file is not removed, which should be located at \(shellConfigPath)")
         } else {
@@ -253,9 +255,17 @@ struct SwiftScriptInit: SwiftScriptWrappedCommand {
         }
         print("Please remove it manually.")
 #elseif os(Windows)
-        TODO()
-#else
-        #error("Unsupported platform")
+        let uninstallScriptPath = appEnv.appBasePath.removingLastComponent().appending("uninstall.bat")
+        try await FileManager.default.createFile(
+            at: uninstallScriptPath, 
+            with: .init(windowsUninstallScriptContents.utf8)
+        )
+        registerCleanUp(when: .interrupt) {
+            try? FileManager.default.removeItem(at: uninstallScriptPath)
+        }
+        _ = try Command.requireInPath("cmd")
+            .addArguments("/c", uninstallScriptPath.string, "2>nul")
+            .spawn()
 #endif
 
     }
@@ -285,36 +295,40 @@ struct SwiftScriptInit: SwiftScriptWrappedCommand {
 
     private func askInstallInfo() async throws -> (installPath: FilePath, swiftPath: String?, swiftVersion: Version?) {
 
-        let installPath = {
+        let installPath = try {
             if let installPath = self.installPath { return installPath }
             guard !noPrompt else { return AppEnv.defaultBasePath }
             print("Path to install (leave empty to use default \(AppEnv.defaultBasePath)): ", terminator: "")
-            guard let path = readLine()?.trimmingCharacters(in: .whitespaces), path.isNotEmpty else { 
-                return AppEnv.defaultBasePath
+            guard let path = readLine()?.trimmingCharacters(in: .whitespaces) else { 
+                throw CancellationError()
             }
+            guard path.isNotEmpty else { return AppEnv.defaultBasePath }
             return FilePath(path)
         }()
 
         try Task.checkCancellation()
 
-        let swiftPath = {
+        let swiftPath = try {
             if let swiftPath = self.swiftPath { return swiftPath.string as String? }
             guard !noPrompt else { return nil as String? }
             print("Path to swift executable (leave empty to use the environment): ", terminator: "")
-            let path = readLine()?.trimmingCharacters(in: .whitespaces)
-            return path?.isEmpty == true ? nil : path
+            guard let path = readLine()?.trimmingCharacters(in: .whitespaces) else {
+                throw CancellationError()
+            }
+            return path.isEmpty ? nil : path
         }()
 
         try Task.checkCancellation()
 
-        let swiftVersion = {
+        let swiftVersion = try {
             if let swiftVersion = self.swiftVersion { return swiftVersion as Version? }
             guard !noPrompt else { return nil as Version? }
             while true {
                 print("Swift version (x.y.z) for building and running script (leave empty to use compiler version): ", terminator: "")
-                guard let versionStr = readLine()?.trimmingCharacters(in: .whitespaces), versionStr.isNotEmpty else { 
-                    return nil as Version? 
+                guard let versionStr = readLine()?.trimmingCharacters(in: .whitespaces) else { 
+                    throw CancellationError()
                 }
+                guard versionStr.isNotEmpty else { return nil }
                 guard let version = Version(string: versionStr) else {
                     logger.printWarning("Invalid version format. Please try again.")
                     continue
@@ -358,6 +372,7 @@ struct SwiftScriptInit: SwiftScriptWrappedCommand {
             .addArguments("package", "init", "--type", "executable", "--name", "swift-script-runner")
             .wait(hidingOutput: true)
 
+        try await appEnv.updatePackageManifest(installedPackages: [])
         try await appEnv.cleanScriptsWithPlaceholderScript()
 
     }
@@ -371,17 +386,72 @@ struct SwiftScriptInit: SwiftScriptWrappedCommand {
 
         let shellSettingScriptPath = try currentShellConfigPath()
 
-        if await !manager.fileExists(at: shellSettingScriptPath) {
-            logger.printDebug("Shell environment configuration file not found. Creating one at \(shellSettingScriptPath)")
-            try await manager.createFile(at: shellSettingScriptPath, with: .init(loadEnvScriptCommands.utf8))
-        } else {
-            try await manager.append(.init(loadEnvScriptCommands.utf8), to: shellSettingScriptPath)
+        if ProcessInfo.processInfo.environment[AppEnv.basePathEnvKey] != appEnv.appBasePath.string {
+            if await !manager.fileExists(at: shellSettingScriptPath) {
+                logger.printDebug("Shell environment configuration file not found. Creating one at \(shellSettingScriptPath)")
+                try await manager.createFile(at: shellSettingScriptPath, with: .init(loadEnvScriptCommands.utf8))
+            } else {
+                try await manager.append(.init(loadEnvScriptCommands.utf8), to: shellSettingScriptPath)
+            }
         }
 
 #elseif os(Windows)
-        
+
+        let envBasePath = try await Command.requireInPath("powershell")
+            .addArguments("-Command", "[Environment]::GetEnvironmentVariable('\(AppEnv.basePathEnvKey)', 'User')")
+            .output.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if envBasePath != appEnv.appBasePath.string {
+
+            var envPath = try await Command.requireInPath("powershell")
+                .addArguments("-Command", "[Environment]::GetEnvironmentVariable('PATH', 'User')")
+                .output.stdout.trimmingSuffix(in: .whitespacesAndNewlines)
+
+            envPath.append(#";"\#(appEnv.binFolderPath)""#)
+
+            try await Command.requireInPath("powershell")
+                .addArguments("-Command", "[Environment]::SetEnvironmentVariable('PATH', '\(envPath)', 'User')")
+                .wait()
+
+            try await Command.requireInPath("powershell")
+                .addArguments("-Command", "[Environment]::SetEnvironmentVariable('\(AppEnv.basePathEnvKey)', '\(appEnv.appBasePath)', 'User')")
+                .wait()
+
+        }
+
 #else
         #error("Unsupported platform")
+#endif
+
+    }
+
+
+    func removeFromEnv() async throws {
+
+#if os(Windows)
+
+        var envPath = try await Command.requireInPath("powershell")
+            .addArguments("-Command", "[Environment]::GetEnvironmentVariable('PATH', 'User')")
+            .output.stdout
+
+        let escapedPath = NSRegularExpression.escapedPattern(for: appEnv.binFolderPath.string)
+
+        if let range = try envPath.firstRange(of: Regex(#";{0,1}\s*"{0,1}\s*\#(escapedPath)\s*"{0,1}\s*;{0,1}"#)) {
+            let matchSubStr = envPath[range]
+            if matchSubStr.last == ";" && matchSubStr.first == ";" {
+                envPath.replaceSubrange(range, with: ";")
+            } else {
+                envPath.removeSubrange(range)   
+            }
+            try await Command.requireInPath("powershell")
+                .addArguments("-Command", "[Environment]::SetEnvironmentVariable('PATH', '\(envPath)', 'User')")
+                .wait()
+        }
+
+        try await Command.requireInPath("powershell")
+            .addArguments("-Command", "[Environment]::SetEnvironmentVariable('\(AppEnv.basePathEnvKey)', $null, 'User')")
+            .wait()
+
 #endif
 
     }
@@ -391,7 +461,16 @@ struct SwiftScriptInit: SwiftScriptWrappedCommand {
 
 extension SwiftScriptInit {
 
+    var cachePath: FilePath {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd-HH-mm-ss"
+        let dateString = formatter.string(from: Date())
+        return appEnv.appBasePath.removingLastComponent()
+            .appending((appEnv.appBasePath.lastComponent?.string ?? "") + "-\(dateString)")
+    }
+
     var envScriptContent: String {
+#if canImport(Glibc) || canImport(Darwin)
         """
         export \(AppEnv.basePathEnvKey)="\(appEnv.appBasePath)"
         SWIFT_SCRIPT_BIN="\(appEnv.binFolderPath)"
@@ -399,6 +478,18 @@ extension SwiftScriptInit {
             export PATH="$SWIFT_SCRIPT_BIN:$PATH"
         fi
         """
+#elseif os(Windows)
+        """
+        @echo off
+        if not "%\(AppEnv.basePathEnvKey)%"=="\(appEnv.appBasePath)" (
+            powershell -Command [Environment]::SetEnvironmentVariable('PATH', "$([Environment]::GetEnvironmentVariable('Path', 'User'));\(appEnv.binFolderPath)", 'User')
+            powershell -Command [Environment]::SetEnvironmentVariable('\(AppEnv.basePathEnvKey)', '\(appEnv.appBasePath)', 'User')
+        )
+        
+        """
+#else
+        #error("Unsupported platform")
+#endif
     }
 
     var loadEnvScriptCommands: String {
@@ -406,6 +497,21 @@ extension SwiftScriptInit {
 
         # Swift Script
         . "\(appEnv.envScriptPath)"
+        """
+    }
+
+
+    var windowsUninstallScriptContents: String {
+        """
+        @echo off
+        :check
+        tasklist | find "\(appEnv.swiftScriptBinaryPath)" > nul
+        if %errorlevel% equ 0 (
+            timeout /t 1 /nobreak > nul
+            goto check
+        )
+        rmdir /S /Q "\(appEnv.appBasePath)"
+        del /F /Q "%~f0"
         """
     }
 

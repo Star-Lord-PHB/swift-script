@@ -30,12 +30,34 @@ extension AppEnv {
 
     var binFolderPath: FilePath { appBasePath.appending("bin") }
 
-    var swiftScriptBinaryPath: FilePath { binFolderPath.appending("swiftscript") }
+    var swiftScriptBinaryPath: FilePath { 
+#if canImport(Darwin) || canImport(Glibc)
+        binFolderPath.appending("swiftscript") 
+#elseif os(Windows)
+        binFolderPath.appending("swiftscript.exe")
+#else
+        #error("Unsupported platform")
+#endif
+    }
 
-    var envScriptPath: FilePath { appBasePath.appending("env.sh") }
+    var envScriptPath: FilePath { 
+#if canImport(Darwin) || canImport(Glibc)
+        appBasePath.appending("env.sh") 
+#elseif os(Windows)
+        appBasePath.appending("env.cmd")
+#else
+        #error("Unsupported platform")
+#endif
+    }
 
     var executableProductPath: FilePath {
+#if canImport(Darwin) || canImport(Glibc)
         runnerPackagePath.appending(".build/release/Runner")
+#elseif os(Windows)
+        runnerPackagePath.appending(".build/release/Runner.exe")
+#else
+        #error("Unsupported platform")
+#endif
     }
 
     var processLockPath: FilePath {
