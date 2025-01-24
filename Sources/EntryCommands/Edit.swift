@@ -65,9 +65,28 @@ struct SwiftScriptEdit: SwiftScriptWrappedCommand {
                 .wait()
         } else {
             logger.printDebug("No editor configuration found, trying to use VSCode")
+#if os(Windows)
+            guard let paths = ProcessInfo.processInfo.environment["Path"]?
+                .split(separator: ";").lazy
+                .map(FilePath.init) 
+            else {
+                throw CLIError(reason: "Failed to get PATH environment variable")
+            }
+            var codePath: FilePath?
+            for path in paths {
+                codePath = path.appending("code.cmd")
+                if (try? await FileManager.default.infoOfItem(at: codePath!))?.isRegularFile == true { break }
+                codePath = nil
+            }
+            guard let codePath else { throw CLIError(reason: "Failed to find VSCode executable in PATH") }
+            try await Command.requireInPath("cmd")
+                .addArguments("/c", codePath.string, "--wait", "-n", editWorkspacePath.string)
+                .wait()
+#else 
             try await Command.requireInPath("code")
                 .addArguments("--wait", "-n", editWorkspacePath.string)
                 .wait()
+#endif
         }
         
     

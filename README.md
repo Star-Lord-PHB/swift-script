@@ -14,8 +14,8 @@ Currently known limitations:
 - [ ] Not tested on Windows yet (swift-testing for executable target on Windows is kind of broken?)
 - [x] ~~Does not support customized swift location yet~~
 - [ ] Does not support module alias yet 
-- [ ] No idea how to support code completion yet
-- [ ] The `--help` output and docs are not completed yet
+- [x] ~~No idea how to support code completion yet~~
+- [x] ~~The `--help` output and docs are not completed yet~~
 - [ ] May be more ......
 
 ## Build and Run
@@ -98,21 +98,21 @@ When run with no subcommands specified, the `run` subcommand will be automatical
 #### Run Command
 
 ```sh
-SwiftScript run <path_to_script> [arguments]
+swiftscript run <path_to_script> [arguments]
 ```
 
 Run and script written in swift specified by the path. The additional `arguments` will also be fed into the script. 
 
 Examples:
 ```sh
-SwiftScript run script.swift
-SwiftScript ~/scripts/hello Serika
+swiftscript run script.swift
+swiftscript ~/scripts/hello Serika
 ```
 
 #### Install Command
 
 ```sh
-SwiftScript install <package_url | package_identity> [version_option]
+swiftscript install <package_url | package_identity> [version_option]
 ```
 
 * `package_url`: the remote url of the package git repository
@@ -128,15 +128,15 @@ If the specified package is already installed, `SwiftScript` will ask whether to
 
 Examples:
 ```sh
-SwiftScript install https://github.com/apple/swift-collections.git
-SwiftScript install swift-system --from 1.2.0 --to 1.2.5
-SwiftScript install swift-system --branch main --force-replace
+swiftscript install https://github.com/apple/swift-collections.git
+swiftscript install swift-system --from 1.2.0 --to 1.2.5
+swiftscript install swift-system --branch main --force-replace
 ```
 
 #### Uninstall Command
 
 ```sh
-SwiftScript uninstall <package_identities>
+swiftscript uninstall <package_identities>
 ```
 
 Uninstall the specified list of packages. All these packages must be installed.
@@ -144,14 +144,14 @@ Alias: `remove`, `rm`
 
 Examples:
 ```sh
-SwiftScript uninstall swif-system
-SwiftScript remove swift-system swift-collections
+swiftscript uninstall swif-system
+swiftscript remove swift-system swift-collections
 ```
 
 #### List Command
 
 ```sh
-SwiftScript list
+swiftscript list
 ```
 
 Print out all the installed packages as a dependency tree, which may look something like this: 
@@ -167,7 +167,7 @@ Print out all the installed packages as a dependency tree, which may look someth
 #### Search Command
 
 ```sh
-SwiftScript search <package_identity>
+swiftscript search <package_identity>
 ```
 
 Search the provided package identity using [Swift Package Index](https://swiftpackageindex.com) and print out information related to that package.
@@ -176,14 +176,14 @@ By default the command will not print the dependency tree of the package. If you
 
 Examples
 ```sh
-SwiftScript search swift-system
-SwiftScript search swift-collections --show-dependencies
+swiftscript search swift-system
+swiftscript search swift-collections --show-dependencies
 ```
 
 #### Info Command
 
 ```sh
-SwiftScript info <package_identity>
+swiftscript info <package_identity>
 ```
 
 Print out information of the specified package identity, which must already be installed.
@@ -194,43 +194,65 @@ Like the `Search` Command, the command will not print the dependency tree of the
 
 Examples
 ```sh
-SwiftScript info swift-system
-SwiftScript info swift-collections --show-dependencies
+swiftscript info swift-system
+swiftscript info swift-collections --show-dependencies
 ```
 
 #### Update Command
 
 ```sh
-SwiftScript update <package_identity> [version_option]
+swiftscript update <package_identity> [version_option]
 ```
 
 Update the specified package with the specified version requirements. This command is basically the same as calling `install` command with the `--force-replace` option. 
 
 ```sh
-SwiftScript update --all
+swiftscript update --all
 ```
 
 Another way of using this command. In this case, all the installed packages will be replaced with their latest sementic version. 
 
 Examples:
 ```sh
-SwiftScript update swift-system --branch main
-SwiftScript update swift-collection --exact 1.3.0
-SwiftScript update --all
+swiftscript update swift-system --branch main
+swiftscript update swift-collection --exact 1.3.0
+swiftscript update --all
+```
+
+#### Edit Command
+
+```sh
+swiftscript edit <path_to_script>
+```
+
+Edit a swift script file by creating a temp workspace SPM project, which already has all the installed packages available as dependencies. 
+
+It is not required to edit script with this command, but it's currently the only way to have auto-completion available. 
+
+Examples:
+```sh
+swiftscript edit main.swift
 ```
 
 #### Config Command
 
 ```sh
-SwiftScript config <config_name>
-SwiftScript config set <config_options>
+swiftscript config <config_name>
+swiftscript config set <config_options>
+swiftscript config set editor <editor_path> <args>
 ```
 
-Read / Modify configuration of the `SwiftCommand`. 
+Read / Modify configuration of `SwiftSwift`. 
+
+To show current config, use: 
+
+```sh
+swiftscript config 
+```
 
 To modify config, use the format
 ```sh
-SwiftScript config set --config_name1=value1 --config_name2=value2 --clear_config_name1 --clear_config_name2 ...
+swiftscript config set --config_name1=value1 --config_name2=value2 --clear_config_name1 --clear_config_name2 ...
 ```
 
 Currently `SwiftScript` supports the following configs: 
@@ -240,10 +262,24 @@ Currently `SwiftScript` supports the following configs:
 
 Examples: 
 ```sh
-SwiftScript config swift_version
-SwiftScript config set --swift_version=6.0.0
-SwiftScript config set --swift_version=6.0.2 --macos_version=15.1 --swift_path="/usr/bin/swift"
-SwiftScript config set --swift_version=6.0.2 --clear_macos_version --swift_path="/usr/bin/swift"
+swiftscript config swift_version
+swiftscript config set --swift_version=6.0.0
+swiftscript config set --swift_version=6.0.2 --macos_version=15.1 --swift_path="/usr/bin/swift"
+swiftscript config set --swift_version=6.0.2 --clear_macos_version --swift_path="/usr/bin/swift"
+```
+
+To set the editor for editing scripts, use the `editor` subcommand. It requires the path to the executable of the editor and additional arguments to pass to the editor. 
+
+When the editor is not specified, `SwiftScript` will try to find VSCode in the environment.
+
+`SwiftScript` support any editors with the following 2 requirements:
+* The editor is able to open a folder 
+* The editor can be configured to not return before the editing window is closed by the user. The `-n --wait` flags is an example for VSCode. If this requirement is not met, `SwiftScript` will immediately delete the temp workspace project. 
+
+Examples: 
+
+```sh
+swiftscript config set editor "/usr/local/bin/code" -n --wait
 ```
 
 #### Init Command
