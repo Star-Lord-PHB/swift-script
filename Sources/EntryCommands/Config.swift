@@ -7,6 +7,7 @@ struct SwiftScriptConfig: SwiftScriptWrappedCommand {
 
     static let configuration: CommandConfiguration = .init(
         commandName: "config",
+        abstract: "Show the current SwiftScript configuration.",
         subcommands: [SwiftScriptConfigSet.self]
     )
 
@@ -21,6 +22,9 @@ struct SwiftScriptConfig: SwiftScriptWrappedCommand {
             swift path: \(config.swiftFilePath ?? "(not specified)")
             swift tools version: \(config.swiftVersion?.description ?? "(not specified)")
             macOS min support version: \(config.macosVersion?.description ?? "(not specified)")
+            editor: 
+                path: \(config.editorConfig?.editorPath ?? "(not specified)")
+                arguments: \(config.editorConfig?.editorArguments.joined(separator: " ") ?? "(not specified)")
             """
         )
 #else
@@ -28,6 +32,9 @@ struct SwiftScriptConfig: SwiftScriptWrappedCommand {
             """
             swift path: \(config.swiftFilePath ?? "(not specified)")
             swift tools version: \(config.swiftVersion?.description ?? "(not specified)")
+            editor: 
+                path: \(config.editorConfig?.editorPath ?? "(not specified)")
+                arguments: \(config.editorConfig?.editorArguments.joined(separator: " ") ?? "(not specified)")
             """
         )
 #endif
@@ -39,26 +46,36 @@ struct SwiftScriptConfig: SwiftScriptWrappedCommand {
 
 struct SwiftScriptConfigSet: SwiftScriptWrappedCommand {
 
-    static let configuration: CommandConfiguration = .init(commandName: "set")
+    static let configuration: CommandConfiguration = .init(
+        commandName: "set", 
+        abstract: "Modify the SwiftScript configuration.",
+        subcommands: [SwiftScriptSetEditor.self]
+    )
 
-    @Option(transform: Version.parse(_:))
+    @Option(
+        help: "The swift tools version for building and running the script, default to the compiler's version", 
+        transform: Version.parse(_:)
+    )
     var swiftVersion: Version?
 
-    @Option(transform: FilePath.init(_:))
+    @Option(
+        help: "The path to the swift binary, default to use the environment", 
+        transform: FilePath.init(_:)
+    )
     var swiftPath: FilePath?
 
-    @Flag 
+    @Flag(help: "Clear the swift path from the config")
     var clearSwiftPath: Bool = false
 
-    @Flag
+    @Flag(help: "Clear the swift tools version from the config")
     var clearSwiftVersion: Bool = false
 
 #if os(macOS)
-    @Flag
-    var clearMacosVersion: Bool = false
-
-    @Option(transform: Version.parse(_:))
+    @Option(help: "The macOS min support version", transform: Version.parse(_:))
     var macosVersion: Version?
+
+    @Flag(help: "Clear the macOS min support version from the config")
+    var clearMacosVersion: Bool = false
 #endif
     
     @Flag(name: .long)
@@ -71,24 +88,12 @@ struct SwiftScriptConfigSet: SwiftScriptWrappedCommand {
     var logger: Logger = .init()
 
 
-    func validate() throws {
-        
-#if os(macOS)
-        guard swiftVersion != nil || macosVersion != nil || swiftPath != nil || clearSwiftPath || clearSwiftVersion || clearMacosVersion else {
-            logger.printWarning("No config update specified")
-            throw ExitCode.success
-        }
-#else
-        guard swiftVersion != nil || swiftPath != nil || clearSwiftPath || clearSwiftVersion else {
-            logger.printWarning("No config update specified")
-            throw ExitCode.success
-        }
-#endif
-
-    }
-
-
     func wrappedRun() async throws {
+
+        guard hasInput else {
+            logger.printWarning("No config update specified")
+            throw ExitCode.success
+        }
 
         logger.printDebug("Loading original configuration and package manifest ...")
         let original = try await appEnv.cacheOriginals(\.config, \.packageManifest)
@@ -139,6 +144,72 @@ struct SwiftScriptConfigSet: SwiftScriptWrappedCommand {
             try await appEnv.cleanRunnerPackage()
             try await appEnv.buildRunnerPackage(verbose: true)
         } 
+
+    }
+
+
+    private var hasInput: Bool {
+#if os(macOS)
+        swiftVersion != nil || macosVersion != nil || swiftPath != nil || clearSwiftPath || clearSwiftVersion || clearMacosVersion
+#else
+        swiftVersion != nil || swiftPath != nil || clearSwiftPath || clearSwiftVersion
+#endif
+    }
+
+}
+
+
+
+struct SwiftScriptSetEditor: SwiftScriptWrappedCommand {
+
+    static let configuration: CommandConfiguration = .init(
+        commandName: "editor",
+        abstract: "Set the editor for editing scripts.",
+        discussion: """
+            MUST make sure that the binary will not return before the editor window is closed, \
+            otherwise SwiftScript will delete the editing workspace immediately.
+            For example, if VSCode is used, make sure to use the `-n` and `--wait` arguments.
+            By default, it try to find VSCode the the PATH and run it with `code -n --wait`.
+            """
+    )
+
+    @Argument(
+        help: "The path to the preferred editor binary", 
+        transform: FilePath.init(_:)
+    )
+    var editorPath: FilePath?
+
+    @Argument(parsing: .captureForPassthrough, help: "The arguments to pass to the editor")
+    var editorArguments: [String] = []
+
+    @Flag(help: "Clear the editor configuration")
+    var clear: Bool = false
+
+    @Flag(name: .long)
+    var verbose: Bool = false
+
+    var appEnv: AppEnv = .fromEnv()
+    var logger: Logger = .init()
+
+
+    func wrappedRun() async throws {
+
+        let editorConfig: EditorConfig?
+        if clear {
+            logger.printDebug("Clearing editor configuration")
+            editorConfig = nil 
+        } else if let editorPath {
+            logger.printDebug("Setting editor configuration to \(editorPath.string) \(editorArguments.joined(separator: " "))")
+            editorConfig = .init(editorPath: editorPath.string, editorArguments: editorArguments)
+        } else {
+            logger.printWarning("No editor configuration specified")
+            throw ExitCode.success
+        }
+
+        var config = appEnv.appConfig
+        config.editorConfig = editorConfig
+
+        try await appEnv.saveAppConfig(config)
 
     }
 

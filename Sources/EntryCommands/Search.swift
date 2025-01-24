@@ -12,7 +12,10 @@ import SwiftCommand
 
 struct SwiftScriptSearch: SwiftScriptWrappedCommand {
     
-    static let configuration: CommandConfiguration = .init(commandName: "search", shouldDisplay: false)
+    static let configuration: CommandConfiguration = .init(
+        commandName: "search", 
+        abstract: "Search for a package by identity"
+    )
 
     @Argument(transform: { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() })
     var identity: String 

@@ -14,6 +14,7 @@ struct SwiftScriptUninstall: SwiftScriptWrappedCommand {
     
     static let configuration: CommandConfiguration = .init(
         commandName: "uninstall",
+        abstract: "Uninstall packages",
         aliases: ["remove", "rm"]
     )
     

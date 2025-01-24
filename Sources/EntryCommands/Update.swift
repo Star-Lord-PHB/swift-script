@@ -12,15 +12,26 @@ import SwiftCommand
 
 struct SwiftScriptUpdate: SwiftScriptWrappedCommand {
     
-    static let configuration: CommandConfiguration = .init(commandName: "update")
+    static let configuration: CommandConfiguration = .init(
+        commandName: "update",
+        abstract: "Update installed packages",
+        discussion: """
+            Can either: 
+            * update one specific package using a new version requirement (same as using `--force-replace` option on `install` command)
+            * update all installed packages using the latest semantic version
+            """
+    )
     
-    @Argument(transform: { $0.trimmingCharacters(in: .whitespaces).lowercased() })
+    @Argument(
+        help: "The identity of the package to update",
+        transform: { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+    )
     var package: String?
     
     @OptionGroup
     var packageUpdateVersionSpec: PackageVersionSpecifierArguments
     
-    @Flag
+    @Flag(help: "Update all installed packages to the latest semantic version")
     var all: Bool = false
     
     @Option(name: .customLong("Xbuild"), parsing: .singleValue, help: #"Pass flag through to "swift build" command"#)
@@ -29,10 +40,10 @@ struct SwiftScriptUpdate: SwiftScriptWrappedCommand {
     @Flag(name: .shortAndLong)
     var verbose: Bool = false
     
-    @Flag(name: [.customShort("y"), .customLong("yes")])
+    @Flag(name: [.customShort("y"), .customLong("yes")], help: "Skip confirmation prompt")
     var noPrompt: Bool = false
 
-    @Flag(help: "If set, will not build the package after installation (NOT RECOMMENDED! Aimed only for faster testing)")
+    @Flag(help: .init("If set, will not build the package after installation (NOT RECOMMENDED! Aimed only for faster testing)", visibility: .hidden))
     var noBuild: Bool = false
 
     var appEnv: AppEnv = .fromEnv()

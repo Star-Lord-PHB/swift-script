@@ -12,6 +12,7 @@ import AsyncAlgorithms
 struct SwiftScript: AsyncParsableCommand {
     
     static let configuration: CommandConfiguration = .init(
+        commandName: "swiftscript",
         subcommands: [
             SwiftScriptRun.self,
             SwiftScriptInstall.self,
@@ -21,6 +22,7 @@ struct SwiftScript: AsyncParsableCommand {
             SwiftScriptUpdate.self,
             SwiftScriptSearch.self,
             SwiftScriptConfig.self,
+            SwiftScriptEdit.self,
             SwiftScriptInit.self,
         ],
         defaultSubcommand: SwiftScriptRun.self

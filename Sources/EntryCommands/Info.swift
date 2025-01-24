@@ -12,7 +12,10 @@ import SwiftCommand
 
 struct SwiftScriptInfo: SwiftScriptWrappedCommand {
     
-    static let configuration: CommandConfiguration = .init(commandName: "info")
+    static let configuration: CommandConfiguration = .init(
+        commandName: "info",
+        abstract: "Show information about an installed package"
+    )
     
     @Argument(
         help: "show detail information of a specified package",
@@ -20,7 +23,7 @@ struct SwiftScriptInfo: SwiftScriptWrappedCommand {
     )
     var package: String
 
-    @Flag(name: .long)
+    @Flag(name: .long, help: "Show dependencies of the package")
     var showDependencies: Bool = false
     
     @Flag(name: .long)

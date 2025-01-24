@@ -12,7 +12,10 @@ import SwiftCommand
 
 struct SwiftScriptList: SwiftScriptWrappedCommand {
     
-    static let configuration: CommandConfiguration = .init(commandName: "list")
+    static let configuration: CommandConfiguration = .init(
+        commandName: "list",
+        abstract: "List all installed packages"
+    )
 
     var appEnv: AppEnv = .fromEnv()
     

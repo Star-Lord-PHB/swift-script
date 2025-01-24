@@ -147,3 +147,43 @@ extension AppEnv {
     }
 
 }
+
+
+
+extension AppEnv {
+
+    func createNewEditWorkspace() async throws -> FilePath {
+
+        try Task.checkCancellation()
+        let workSpacePath = try await makeEditWorkspaceDir()
+
+        let manager = FileManager.default
+
+        do {
+
+            try await manager.copyItem(at: runnerPackageManifestPath, to: workSpacePath.appending("Package.swift"))
+            try await manager.createDirectory(at: workSpacePath.appending("Sources"))
+
+            let sourcekitConfigDir = workSpacePath.appending(".sourcekit-lsp")
+            let sourceKitConfigContent = """
+                {
+                    "swiftPM": {
+                        "configuration": "release"
+                    },
+                    "backgroundIndexing": true 
+                }
+                """
+            try await manager.createDirectory(at: sourcekitConfigDir)
+            try await manager.createFile(at: sourcekitConfigDir.appending("config.json"), with: .init(sourceKitConfigContent.utf8))
+
+        } catch {
+            try? await manager.removeItem(at: workSpacePath)
+            throw error
+        }
+
+        return workSpacePath
+
+
+    }
+
+}

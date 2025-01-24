@@ -60,6 +60,8 @@ extension AppEnv {
 #endif
     }
 
+    var editWorkspacesDirPath: FilePath { appBasePath.appending("edit") }
+
     var processLockPath: FilePath {
         appBasePath.appending("lock.lock")
     }
@@ -86,6 +88,13 @@ extension AppEnv {
             try await FileManager.default.removeItem(at: filePath)
             throw error
         }
+    }
+
+    func makeEditWorkspaceDir() async throws -> FilePath {
+        try Task.checkCancellation()
+        let path = editWorkspacesDirPath.appending(UUID().uuidString)
+        try await FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
+        return path
     }
 
     func scriptBuildPath(ofType type: ScriptType) -> FilePath {

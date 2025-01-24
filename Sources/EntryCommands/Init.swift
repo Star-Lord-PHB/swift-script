@@ -6,7 +6,10 @@ import SwiftCommand
 
 struct SwiftScriptInit: SwiftScriptWrappedCommand {
 
-    static let configuration: CommandConfiguration = .init(commandName: "init")
+    static let configuration: CommandConfiguration = .init(
+        commandName: "init",
+        abstract: "Install / Reinstall / Uninstall SwiftScript"
+    )
 
     @Flag(name: .long, help: "Uninstall SwiftScript")
     var uninstall: Bool = false
@@ -144,6 +147,15 @@ struct SwiftScriptInit: SwiftScriptWrappedCommand {
         }
 
         try await manager.moveItem(at: appEnv.swiftScriptBinaryPath, to: cachePath)
+
+        registerCleanUp(when: .normalExit) {
+            do {
+                try await FileManager.default.removeItem(at: cachePath)
+            } catch {
+                logger.printWarning("Failed to remove the temporary cached original binary at \(appEnv.swiftScriptBinaryPath): \(error)")
+                logger.printWarning("Please remove it manually.")
+            }
+        }
 
         registerCleanUp(when: .interrupt) {
             do {
@@ -497,6 +509,7 @@ extension SwiftScriptInit {
 
         # Swift Script
         . "\(appEnv.envScriptPath)"
+        
         """
     }
 

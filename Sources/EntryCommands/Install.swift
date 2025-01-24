@@ -12,7 +12,10 @@ import SwiftCommand
 
 struct SwiftScriptInstall: SwiftScriptWrappedCommand {
     
-    static let configuration: CommandConfiguration = .init(commandName: "install")
+    static let configuration: CommandConfiguration = .init(
+        commandName: "install",
+        abstract: "Install packages"
+    )
     
     @Argument(
         help: "The package to install (identity or url of the package)", 
@@ -32,7 +35,7 @@ struct SwiftScriptInstall: SwiftScriptWrappedCommand {
     @Option(name: .customLong("Xbuild"), parsing: .singleValue, help: #"Pass flag through to "swift build" command"#)
     var buildArguments: [String] = []
 
-    @Flag(help: "If set, will not build the package after installation (NOT RECOMMENDED! Aimed only for faster testing)")
+    @Flag(help: .init("If set, will not build the package after installation (NOT RECOMMENDED! Aimed only for faster testing)", visibility: .hidden))
     var noBuild: Bool = false
 
     var appEnv: AppEnv = .fromEnv()

@@ -14,6 +14,7 @@ struct AppConfig: Equatable, Sendable {
     var macosVersion: Version? = nil 
     var swiftVersion: Version? = nil 
     var swiftPath: String? = nil 
+    var editorConfig: EditorConfig? = nil
 
     var swiftFilePath: FilePath? {
         swiftPath.map { .init($0) }
@@ -29,6 +30,7 @@ extension AppConfig: Codable {
         case macosVersion
         case swiftVersion
         case swiftPath
+        case editorConfig
     }
 
 
@@ -41,6 +43,7 @@ extension AppConfig: Codable {
 #endif
         try container.encodeIfPresent(swiftVersion, forKey: .swiftVersion)
         try container.encodeIfPresent(swiftPath, forKey: .swiftPath)
+        try container.encodeIfPresent(editorConfig, forKey: .editorConfig)
 
     }
 
@@ -54,7 +57,19 @@ extension AppConfig: Codable {
 #endif
         swiftVersion = try container.decodeIfPresent(Version.self, forKey: .swiftVersion)
         swiftPath = try container.decodeIfPresent(String.self, forKey: .swiftPath)
+        editorConfig = try container.decodeIfPresent(EditorConfig.self, forKey: .editorConfig)
 
     }
+
+}
+
+
+
+struct EditorConfig: Sendable, Equatable, Codable {
+
+    var editorPath: String
+    var editorArguments: [String] = []
+
+    var editorFilePath: FilePath { .init(editorPath) }
 
 }

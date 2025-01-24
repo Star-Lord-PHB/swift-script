@@ -12,7 +12,10 @@ import SwiftCommand
 
 struct SwiftScriptRun: SwiftScriptWrappedCommand {
     
-    static let configuration: CommandConfiguration = .init(commandName: "run")
+    static let configuration: CommandConfiguration = .init(
+        commandName: "run",
+        abstract: "Run a script"
+    )
     
     @Argument(
         help: "path to the script", 
