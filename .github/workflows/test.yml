@@ -10,11 +10,29 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
+  build-linux:
     name: Swift ${{ matrix.swift }} on ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-15, ubuntu-latest, windows-latest]
+        os: [ubuntu-latest]
+        swift: ["6.0"]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: swift-actions/setup-swift@v2
+      with:
+          swift-version: ${{ matrix.swift }}
+    - name: Build Release
+      run: swift build -c release -v
+    # - name: Run Tests
+    #   run: swift test -v
+
+  build-macOS:
+    name: Swift ${{ matrix.swift }} on ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-15]
         swift: ["6.0"]
     runs-on: ${{ matrix.os }}
 
@@ -25,5 +43,23 @@ jobs:
           swift-version: ${{ matrix.swift }}
     - name: Build Release
       run: swift build -c release -v -Xswiftc -disable-round-trip-debug-types
+    # - name: Run Tests
+    #   run: swift test -v
+
+  # build-windows:
+  #   name: Swift ${{ matrix.swift }} on ${{ matrix.os }}
+  #   strategy:
+  #     matrix:
+  #       os: [windows-latest]
+  #       swift: ["6.0"]
+  #   runs-on: ${{ matrix.os }}
+
+  #   steps:
+  #   - uses: actions/checkout@v4
+  #   - uses: swift-actions/setup-swift@v2
+  #     with:
+  #         swift-version: ${{ matrix.swift }}
+  #   - name: Build Release
+  #     run: swift build -c release -v -Xswiftc
     # - name: Run Tests
     #   run: swift test -v
