@@ -14,8 +14,7 @@ jobs:
     name: Swift ${{ matrix.swift }} on ${{ matrix.os }}
     strategy:
       matrix:
-        # os: [macos-15, ubuntu-latest, windows-latest]
-        os: [ubuntu-latest]
+        os: [macos-15, ubuntu-latest, windows-latest]
         swift: ["6.0"]
     runs-on: ${{ matrix.os }}
 
@@ -24,9 +23,7 @@ jobs:
     - uses: swift-actions/setup-swift@v2
       with:
           swift-version: ${{ matrix.swift }}
-    - name: Build Debug
-      run: swift build -v
     - name: Build Release
-      run: swift build -c release -v
+      run: swift build -c release -v -Xswiftc -disable-round-trip-debug-types
     # - name: Run Tests
     #   run: swift test -v
