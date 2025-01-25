@@ -39,7 +39,7 @@ extension AppEnv {
             .addArguments(
                 "build",
                 "--package-path", runnerPackagePath.string,
-                "-c", "release"
+                "-c", "debug"
             )
             .wait(printingOutput: verbose)
     }

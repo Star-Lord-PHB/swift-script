@@ -52,9 +52,9 @@ extension AppEnv {
 
     var executableProductPath: FilePath {
 #if canImport(Darwin) || canImport(Glibc)
-        runnerPackagePath.appending(".build/release/Runner")
+        runnerPackagePath.appending(".build/debug/Runner")
 #elseif os(Windows)
-        runnerPackagePath.appending(".build/release/Runner.exe")
+        runnerPackagePath.appending(".build/debug/Runner.exe")
 #else
         #error("Unsupported platform")
 #endif

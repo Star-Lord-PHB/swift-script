@@ -168,7 +168,7 @@ extension AppEnv {
             let sourceKitConfigContent = """
                 {
                     "swiftPM": {
-                        "configuration": "release"
+                        "configuration": "debug"
                     },
                     "backgroundIndexing": true 
                 }
