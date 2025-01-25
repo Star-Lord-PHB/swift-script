@@ -5,7 +5,7 @@ cd ~/.swift-script
 
 mkdir runner 
 cd runner 
-env swift package init --type executable --name swift-script-runner > /dev/null 2>&1
+env swift package init --type executable --name Runner > /dev/null 2>&1
 rm ./Sources/main.swift
 touch ./Sources/Placeholder.swift
 env swift package resolve
@@ -15,11 +15,6 @@ echo "[]" > packages.json
 
 mkdir temp 
 mkdir "exec"
+mkdir bin
 
-configContent="
-{
-    \"swiftVersion\": \"6.0\",
-    \"macosVersion\": \"15\"
-}
-"
-echo "$configContent" > config.json
+echo "{}" > config.json

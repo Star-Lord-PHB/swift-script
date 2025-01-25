@@ -6,7 +6,7 @@ cd %USERPROFILE%\.swift-script
 mkdir runner
 cd runner
 
-swift package init --type executable --name swift-script-runner >NUL 2>&1
+swift package init --type executable --name Runner >NUL 2>&1
 del .\Sources\main.swift
 echo. > .\Sources\Placeholder.swift
 swift package resolve
@@ -16,11 +16,6 @@ echo [] > packages.json
 
 mkdir temp
 mkdir exec
+mkdir bin 
 
-setlocal enabledelayedexpansion
-(
-    echo {
-    echo     "swiftVersion": "6.0"
-    echo }
-) > config.json
-endlocal
+echo "{}" > config.json

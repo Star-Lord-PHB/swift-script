@@ -58,7 +58,7 @@ Build with standard swift build command:
 ```sh
 # debug mode
 swift build
-# release mode (Not working on Windows Yet)
+# release mode (Not working on ARM Windows Yet)
 swift build -c release 
 ```
 
@@ -68,7 +68,7 @@ Alternatively, you can use `swift run` command to execute it immediately:
 ```sh
 # debug mode
 swift run SwiftScript [args]
-#release mode (Not working on Windows Yet)
+#release mode (Not working on ARM Windows Yet)
 swift run -c release SwiftScript [args]
 ```
 
@@ -78,7 +78,11 @@ To make things easier, there is a script provided in the `manual_test_scripts` f
 ./manual_test_scripts/run [args]
 ```
 
-**_Note that currently this script run the DEBUG executable directly without building, so remember to build in DEBUG mode first before running it._**
+## Installation 
+
+1. Build the executable by following the stpes in [Build and Run](#build-and-run)
+2. Run the executable with the `init` argument (`./SwiftScript init`)
+3. Follow the prompts
 
 ## Usage
 

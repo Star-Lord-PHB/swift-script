@@ -65,7 +65,7 @@ struct SwiftScriptRun: SwiftScriptWrappedCommand {
             try await FileManager.default.copyItem(at: scriptPath, to: scriptBuildPath)
             
             logger.printDebug("Building runner with arguments: \(swiftArguments)")
-            if quiet {
+            if quiet || verbose {
                 try await appEnv.buildRunnerPackage(arguments: swiftArguments, verbose: verbose)
             } else {
                 try await withLoadingIndicator("Building") {

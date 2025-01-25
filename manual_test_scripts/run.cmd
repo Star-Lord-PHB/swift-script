@@ -1,3 +1,3 @@
 @echo off
 
-".\.build\debug\SwiftScript.exe" %*
+swift run SwiftScript %*
